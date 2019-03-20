@@ -1,0 +1,11 @@
+# Emily's recommended libraries
+library(devtools)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(lubridate)
+library(data.table)
+library(GREENGridData)
+library(viridis)
+library(ggforce)
