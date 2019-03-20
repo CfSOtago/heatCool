@@ -1,0 +1,123 @@
+---
+title: "Electricity Demand for Heating and Cooling in New Zealand"
+subtitle: "Test outputs"
+author: "Ben Anderson (b.anderson@soton.ac.uk, `@dataknut`) & Emily Jiang
+date: 'Last run at: `r Sys.time()`'
+output:
+  bookdown::html_document2:
+    fig_caption: yes
+    code_folding: hide
+    number_sections: yes
+  bookdown::pdf_document2:
+    fig_caption: yes
+    number_sections: yes
+  bookdown::word_document2:
+    fig_caption: yes
+    number_sections: yes
+---
+```{r knitrSetUp, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE) # do not echo code
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(fig_caption = TRUE)
+knitr::opts_chunk$set(fig_height = 6) # default, make it bigger to stretch vertical axis
+knitr::opts_chunk$set(fig_width = 8) # full width
+knitr::opts_chunk$set(tidy = TRUE) # tidy up code in case echo = TRUE
+```
+
+# Setup
+
+```{r codeSetup, include=FALSE}
+# Set start time ----
+startTime <- proc.time()
+
+# What are we running on?
+sysInfo <- Sys.info()
+myParams <- list()
+myParams$sysName <- sysInfo[[1]]
+myParams$nodeName <- sysInfo[[4]]
+myParams$userName <- sysInfo[[7]]
+
+if(myParams$userName == "ben"){ # BA laptop
+  myParams$dPath <- path.expand("/Volumes/hum-csafe/Research Projects/GREEN Grid/Self_contained_Projects/2018_coolingEmily/archive/")
+}else{
+  myParams$dPath <- "Z:/Research Projects/GREEN Grid/Self_contained_Projects/2018_coolingEmily/archive/" # <- windoze
+}
+  
+# Functions ----
+
+# Give feedback ----
+message("Running on ", myParams$sysName)
+
+# Emily's libraries and functions
+source("../R/libraries.R") # Emily's recommended libraries
+source("../R/functions.R") # Emily's functions
+
+# Local libraries ----
+library(kableExtra)
+# any extras?
+
+```
+# Load final data
+
+## Heat pumps
+First we load Emily's processed heat pump data and run some basic tests.
+
+```{r load.HP.data}
+hpDT <- data.table::fread(paste0(myParams$dPath, "allHouseholds_hourly.csv"))
+
+# fix the date - remember it's UTC
+hpDT <- hpDT[, r_dateTime := lubridate::as_datetime(r_dateTime)]
+hpDT <- hpDT[, r_dateTimeLocal := lubridate::with_tz(r_dateTime, tzone = "Pacific/Auckland")] # convert to local time from UTC
+
+hpDT <- hpDT[, hms := hms::as.hms(r_dateTimeLocal)]
+
+hpDT <- GREENGridData::addNZSeason(hpDT, r_dateTime = r_dateTimeLocal)
+
+kableExtra::kable(head(hpDT, 10), caption = "First 10 rows of (slightly) processed Heat Pump data") %>% 
+  kable_styling()
+
+kableExtra::kable(summary(hpDT), caption = "Summary of Heat Pump data") %>% 
+  kable_styling()
+
+t <- table(hpDT$circuit)
+
+kableExtra::kable(t, caption = "Counts of circuit labels") %>% 
+  kable_styling()
+```
+
+Figure \@ref(fig:simplePlot_HP) shows the mean heat pump demand by time of day by season. Does this look right?
+
+```{r simplePlot_HP, fig.cap="Line plot of mean power demand for Heat Pumps"}
+plotDT <- hpDT[, .(meanW = mean(powerW)), keyby = .(hms, season)]
+
+ggplot2::ggplot(plotDT, aes(x = hms, y = meanW, colour = season)) +
+  geom_line()
+```
+
+Are we seeing some cooling in summer?
+
+## Temperature
+
+First we load this using the two seperate files.
+
+
+
+# Runtime
+
+```{r check runtime}
+t <- proc.time() - startTime
+
+elapsed <- t[[3]]
+```
+
+Analysis completed in `r elapsed` seconds ( `r round(elapsed/60,2)` minutes) using [knitr](https://cran.r-project.org/package=knitr) in [RStudio](http://www.rstudio.com) with `r R.version.string` running on `r R.version$platform`.
+
+# R environment
+
+> list packages used & cite
+ 
+```{r sessionInfo}
+sessionInfo()
+```
+
