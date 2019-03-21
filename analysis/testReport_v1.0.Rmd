@@ -4,15 +4,15 @@ subtitle: "Test data"
 author: "Ben Anderson (ben.anderson@otago.ac.nz, `@dataknut`) & Emily Jiang"
 date: 'Last run at: `r Sys.time()`'
 output:
-  bookdown::word_document2:
-    toc: TRUE
-    fig_caption: TRUE
   bookdown::html_document2:
     toc: TRUE
     toc_float: TRUE
     fig_caption: TRUE
     code_folding: hide
     number_sections: TRUE
+  bookdown::word_document2:
+    toc: TRUE
+    fig_caption: TRUE
   bookdown::pdf_document2:
     toc: TRUE
     fig_caption: TRUE
