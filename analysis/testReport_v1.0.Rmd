@@ -1,24 +1,29 @@
 ---
 title: "Electricity Demand for Heating and Cooling in New Zealand"
-subtitle: "Test outputs"
-author: "Ben Anderson (b.anderson@soton.ac.uk, `@dataknut`) & Emily Jiang
+subtitle: "Test data"
+author: "Ben Anderson (ben.anderson@otago.ac.nz, `@dataknut`) & Emily Jiang"
 date: 'Last run at: `r Sys.time()`'
 output:
-  bookdown::html_document2:
-    fig_caption: yes
-    code_folding: hide
-    number_sections: yes
   bookdown::pdf_document2:
-    fig_caption: yes
-    number_sections: yes
+    toc: TRUE
+    fig_caption: TRUE
+    number_sections: TRUE
+  bookdown::html_document2:
+    toc: TRUE
+    toc_float: TRUE
+    fig_caption: TRUE
+    code_folding: hide
+    number_sections: TRUE
   bookdown::word_document2:
-    fig_caption: yes
-    number_sections: yes
+    toc: TRUE
+    fig_caption: TRUE
+    number_sections: TRUE
 ---
+
 ```{r knitrSetUp, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE) # do not echo code
-knitr::opts_chunk$set(warning = FALSE)
-knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(echo = TRUE) # do not echo code
+knitr::opts_chunk$set(warning = TRUE)
+knitr::opts_chunk$set(message = TRUE)
 knitr::opts_chunk$set(fig_caption = TRUE)
 knitr::opts_chunk$set(fig_height = 6) # default, make it bigger to stretch vertical axis
 knitr::opts_chunk$set(fig_width = 8) # full width
@@ -27,7 +32,9 @@ knitr::opts_chunk$set(tidy = TRUE) # tidy up code in case echo = TRUE
 
 # Setup
 
-```{r codeSetup, include=FALSE}
+This is where we do setup stuff like attaching libraries etc.
+
+```{r codeSetup}
 # Set start time ----
 startTime <- proc.time()
 
@@ -39,73 +46,484 @@ myParams$nodeName <- sysInfo[[4]]
 myParams$userName <- sysInfo[[7]]
 
 if(myParams$userName == "ben"){ # BA laptop
-  myParams$dPath <- path.expand("/Volumes/hum-csafe/Research Projects/GREEN Grid/Self_contained_Projects/2018_coolingEmily/archive/")
+  # myParams$dPath <- path.expand("/Volumes/hum-csafe/Research Projects/GREEN Grid/Self_contained_Projects/2018_coolingEmily/archive/") # HCS - requires VPN/on-campus connection
+  myParams$dPath <- path.expand("~/Data/NZ_GREENGrid/safe/emilyJiang/") # copy of data on HCS
 }else{
   myParams$dPath <- "Z:/Research Projects/GREEN Grid/Self_contained_Projects/2018_coolingEmily/archive/" # <- windoze
 }
   
 # Functions ----
 
-# Give feedback ----
-message("Running on ", myParams$sysName)
-
 # Emily's libraries and functions
 source("../R/libraries.R") # Emily's recommended libraries
 source("../R/functions.R") # Emily's functions
 
 # Local libraries ----
-library(kableExtra)
+library(kableExtra) # for fancy tables
 # any extras?
 
 ```
+
+
+Session info (for reference)
+
+```{r sessionInfo}
+sessionInfo()
+```
+
 # Load final data
 
 ## Heat pumps
+
 First we load Emily's processed heat pump data and run some basic tests.
 
 ```{r load.HP.data}
-hpDT <- data.table::fread(paste0(myParams$dPath, "allHouseholds_hourly.csv"))
+df <- paste0(myParams$dPath, "allHouseholds_hourly.csv.gz")
 
-# fix the date - remember it's UTC
+message("Loading", df)
+hpDT <- data.table::fread(df)
+
+# drop V1 (purpose?)
+hpDT$V1 <- NULL
+
+# location is constant by id so we could just create a table and drop that columhn too but...
+
+# fix the date - remember it's stored as UTC
+hpDT <- hpDT[, r_dateTimeChar := r_dateTime]
 hpDT <- hpDT[, r_dateTime := lubridate::as_datetime(r_dateTime)]
 hpDT <- hpDT[, r_dateTimeLocal := lubridate::with_tz(r_dateTime, tzone = "Pacific/Auckland")] # convert to local time from UTC
 
-hpDT <- hpDT[, hms := hms::as.hms(r_dateTimeLocal)]
+hpDT <- hpDT[, hms := hms::as.hms(r_dateTimeLocal)] # useful for plots and for checking we have the right timezone!
 
 hpDT <- GREENGridData::addNZSeason(hpDT, r_dateTime = r_dateTimeLocal)
+```
 
-kableExtra::kable(head(hpDT, 10), caption = "First 10 rows of (slightly) processed Heat Pump data") %>% 
-  kable_styling()
+If any of the r_dateTimes failed to parse they will have the local time set to NA so we can see what happened (if anything) in Table \@ref(tab:hpDateError). If there are no rows in this table then all r_dateTimes parsed.
 
-kableExtra::kable(summary(hpDT), caption = "Summary of Heat Pump data") %>% 
-  kable_styling()
-
-t <- table(hpDT$circuit)
-
-kableExtra::kable(t, caption = "Counts of circuit labels") %>% 
+```{r hpDateError}
+kableExtra::kable(head(hpDT[is.na(r_dateTime)], 10), caption = "First 10 rows of Heat Pump data where r_dateTime failed to parse (could be none at all)") %>% 
   kable_styling()
 ```
 
-Figure \@ref(fig:simplePlot_HP) shows the mean heat pump demand by time of day by season. Does this look right?
 
-```{r simplePlot_HP, fig.cap="Line plot of mean power demand for Heat Pumps"}
-plotDT <- hpDT[, .(meanW = mean(powerW)), keyby = .(hms, season)]
+Table \@ref(tab:hpHead) shows the first 10 rows of slighty processed data. Note that local time ias set to NZ time while the original r_dateTime is in UTC. This is important for linking the temperature data correctly!
+
+```{r hpHead}
+kableExtra::kable(head(hpDT, 10), caption = "First 10 rows of (slightly) processed Heat Pump data") %>% 
+  kable_styling()
+```
+
+The next table gives a summary of the heat pump data after limited processing (no cleaning) while Table \@ref(tab:hpCircuitLabels) gives a list of all circuit labels seen - as a check on what we think they are measuring.
+
+```{r hpSummary}
+skimr::skim(hpDT)
+```
+
+
+Emily's analysis excludes the following circuits:
+
+ * `Downstairs (inc 1 Heat Pump)$2212`
+ * `Bedroom & Lounge Heat Pumps$2741` - why exclude this one?
+ * `Theatre Heat Pump$2740`
+
+How many of them are there?
+
+```{r hpCircuitLabels}
+
+# flag the circuits we don't want
+hpDT <- hpDT[, includeCircuit := ifelse(circuit == "Downstairs (inc 1 Heat Pump)$2212" |
+                                          circuit == "Bedroom & Lounge Heat Pumps$2741" | # why exclude this one?
+                                          circuit == "Theatre Heat Pump$2740",
+                                        0, # exclude 
+                                        1)] # sets all others to 1
+
+t <- table(hpDT$circuit, hpDT$includeCircuit)
+
+kableExtra::kable(t, caption = "Counts of circuit labels for those we exclude (0) and those we include (1)") %>% 
+  kable_styling()
+```
+
+Table \@ref(tab:hpHouseholds) gives summary statistics for heat pump demand for all circuits and all households (id).
+
+```{r hpHouseholds}
+
+t <- hpDT[, .(nObs = .N,
+              meanW = mean(powerW),
+              minW = min(powerW),
+              maxW = max(powerW)), keyby = .(id, circuit, location)]
+
+kableExtra::kable(t, caption = "Heat pump statistics by household") %>% 
+  kable_styling()
+```
+
+
+Table \@ref(tab:hplocation) gives summary statistics for heat pump demand for all circuits in each location.
+
+```{r hplocation}
+
+
+t <- hpDT[, .(nHouseholds = uniqueN(id),
+              nObs = .N,
+              meanW = mean(powerW),
+              minW = min(powerW),
+              maxW = max(powerW)), keyby = .(location, season)]
+
+kableExtra::kable(t, caption = "Heat pump statistics by household") %>% 
+  kable_styling()
+```
+
+
+Figure \@ref(fig:simpleHistHP) shows the mean heat pump demand by time of day by season. Does this look right?
+
+```{r simpleHistHP, fig.cap="Histogram mean hourly power demand for Heat Pumps by season and location"}
+
+hpCap <- paste0("GREEN Grid Heat Pump circuits, n households = ", uniqueN(hpDT$id),
+                    "\n Time period: ", min(lubridate::date(hpDT$r_dateTimeLocal)), 
+                    " to ",
+                    max(lubridate::date(hpDT$r_dateTimeLocal)))
+
+ggplot2::ggplot(hpDT, aes(x = powerW)) +
+  geom_histogram() +
+  facet_grid(location ~ season) +
+  labs(caption = paste0(hpCap, "\n n circuits: ", uniqueN(hpDT$circuit))
+       )
+```
+
+Figure \@ref(fig:simpleHistHP40) shows same plot but only for power > 40 W and only for the circuits we want to include. Does this look right?
+
+```{r simpleHistHP40, fig.cap="Histogram mean hourly power demand for Heat Pumps by season and location"}
+
+dt <- hpDT[powerW > 40 & includeCircuit == 1]
+ggplot2::ggplot(dt, aes(x = powerW)) +
+  geom_histogram() +
+  facet_grid(location ~ season) +
+  labs(caption = paste0(hpCap, "\n n circuits: ", 
+                        uniqueN(dt$circuit)))
+```
+
+Figure \@ref(fig:simpleLineHP) shows the mean heat pump demand by time of day by season for the circuits we want to include. Does this look right?
+
+Figure \@ref(fig:simpleLineHP) is important because:
+
+ * we converted the incoming UTC dateTime to local (NZT) time -> `r_dateTimeLocal`
+ * we then created a hh:mm variable from `r_dateTimeLocal` and used that to make this plot
+ * so if this looks like the right shape for Heat Pump demand then we have made the correct assumptions about the incoming `r_dateTime`
+
+
+```{r simpleLineHP, fig.cap="Line plot of mean power demand for Heat Pumps by season and location"}
+dt <- hpDT[includeCircuit == 1]
+
+plotDT <- dt[, .(meanW = mean(powerW)), keyby = .(hms, season, location)]
 
 ggplot2::ggplot(plotDT, aes(x = hms, y = meanW, colour = season)) +
-  geom_line()
+  geom_line() +
+  facet_grid(location ~ .) +
+  labs(caption = paste0(hpCap, "\n n circuits: ", uniqueN(dt$circuit),
+                        "\n n observations: ", nrow(dt[!is.na(powerW)]))
+       )
 ```
 
 Are we seeing some cooling in summer?
 
+We can repeat this plot including only powerW values > 40 W (Figure \@ref(fig:simpleLineHP40)). This shows the level of demand _when they are on_. This plot shows some distinct signs of heat pump use in early evenings in summer producing a slightly earlier 'peak' than is the case for winter heating. It has to be said however that the plots are quite messy, no doubt due to the small numbers involved.
+
+```{r simpleLineHP40, fig.cap="Line plot of mean power demand for Heat Pumps by season and location where power > 40W"}
+dt <- hpDT[powerW > 40 & includeCircuit == 1]
+  
+plotDT <-dt[, .(meanW = mean(powerW)), keyby = .(hms, season, location)]
+
+ggplot2::ggplot(plotDT, aes(x = hms, y = meanW, colour = season)) +
+  geom_line() +
+  facet_grid(location ~ .) +
+  labs(caption = paste0(hpCap, "\n Values > 40W only",
+                        "\n n circuits: ", uniqueN(dt$circuit),
+                        "\n n observations: ", nrow(dt[!is.na(powerW)]))
+       )
+```
+
+
 ## Temperature
+
+### 2 files
 
 First we load this using the two seperate files.
 
+```{r load2fTempData}
+message("Loading 15876_hourly_all.txt.gz")
+temp15876DT <- data.table::fread(paste0(myParams$dPath, "15876_hourly_all.txt.gz"))
+message("Loading 23872_hourly_all.txt.gz")
+temp23872DT <- data.table::fread(paste0(myParams$dPath, "23872_hourly_all.txt.gz"))
 
+fixTempData <- function(dt){
+  # bunch of stuff we want to do to each dataset
+  # fix datetime so it matches the hp data
+  dt <- dt[, r_dateTime := lubridate::dmy_hm(`Date(NZST)`, # so we know it's NZT - shame it had to have () in it!
+                                                  tz = "Pacific/Auckland")] # just to be sure (if you ran this code in the UK it would set it to UTC by default)
+  
+  
+  dt <- dt[, hms := hms::as.hms(r_dateTime)]
+  
+  dt <- GREENGridData::addNZSeason(dt)
+  
+  dt <- dt[, r_dateTimeLocal := r_dateTime] # for matching
+  dt <- dt[, location := Station] # for matching
+  
+  return(dt)
+}
+
+temp15876DT <- fixTempData(temp15876DT)
+message("Some dates failed to parse - which ones?")
+
+kableExtra::kable(head(temp15876DT[is.na(r_dateTimeLocal)]), 
+                  caption = "Non-parsed dates for location =  15876")
+
+
+temp23872DT <- fixTempData(temp23872DT)
+message("Some dates failed to parse - which ones?")
+
+kableExtra::kable(head(temp23872DT[is.na(r_dateTimeLocal)]), 
+                  caption = "Non-parsed dates for location =  23872")
+
+
+message("Looks like the ones around the DST switches. We hate DST almost as much as we hate timezones.")
+
+
+```
+
+Now let's look at summaries of the two data files.
+
+```{r testTemp}
+skimr::skim(temp23872DT)
+
+skimr::skim(temp15876DT)
+```
+
+Convert the char values to numeric as needed.
+
+```{r checkTempData}
+# combine the temperature data
+tempDT <- rbind(temp15876DT, temp23872DT)
+
+tempDT <- tempDT[, meanTemp := as.numeric(`Tmean(C)`)]
+
+message("Note that ", nrow(tempDT[is.na(meanTemp)]), " observations have no Tmean(C) values...")
+
+tempDT <- tempDT[, year := lubridate::year(r_dateTime)]
+t <- addmargins(with(tempDT[is.na(meanTemp)], table(Station,year)))
+
+kableExtra::kable(t, caption = "Counts of missing temperature observations by location and year (source: 2 files)") %>%
+  kable_styling()
+
+message("But it's mostly in years we don't have HP data for?")
+```
+
+Figure \@ref(fig:simplePlotTemp) shows the mean temperature by time of day by season. Does this look right? The alpha values are suggesting it's getting warmer...
+
+As above this plot is important. If the shape looks right then we have made the correct assumptions about our incoming dateTime values.
+
+```{r simplePlotTemp, fig.height=6, fig.cap="Line plot of mean temperature by season and location"}
+plotDT <- tempDT[, .(meanT = mean(meanTemp, na.rm = TRUE)), # crucial otherwise any NA causes the calculation to be NA
+                 keyby = .(hms, season, Station, year)]
+
+tempCap <- paste0("Temperature data source: ?? NIWA ??",
+                        "\n Time period: ", min(lubridate::date(tempDT$r_dateTimeLocal), na.rm = TRUE),
+                        " to ",
+                         max(lubridate::date(tempDT$r_dateTimeLocal), na.rm = TRUE)
+                  )
+  
+ggplot2::ggplot(plotDT, aes(x = hms, y = meanT, colour = season, alpha = year)) +
+  geom_point() +
+  facet_grid(Station ~ .) +
+  labs(caption = tempCap)
+```
+
+### 1 file
+
+Now test the single temperature file which contains both.
+
+```{r load1fTempData}
+message("Loading alltemp_hourly.csv.gz")
+
+tempBothDT <- data.table::fread(paste0(myParams$dPath, "alltemp_hourly.csv.gz"))
+
+kableExtra::kable(head(tempBothDT), 
+                  caption = "Head:  alltemp_hourly.csv.gz before processing")
+
+
+tempBothDT <- tempBothDT[, r_dateTimeLocal := lubridate::ymd_hms(r_dateTime, # looks like NZT as the first rows it match the first few rows of temp15876DT
+                                                  tz = "Pacific/Auckland")] # just to be sure (if you ran this code in the UK it would set it to UTC by default)
+  
+  
+  tempBothDT <- tempBothDT[, hms := hms::as.hms(r_dateTimeLocal)]
+  
+  tempBothDT <- GREENGridData::addNZSeason(tempBothDT)
+  
+skimr::skim(tempBothDT)
+
+tempBothDT$V1 <- NULL
+tempBothDT <- tempBothDT[, meanTemp := Tmean_C]
+
+
+kableExtra::kable(head(tempBothDT), 
+                  caption = "Head:  alltemp_hourly.csv.gz after processing")
+
+```
+
+Figure \@ref(fig:simplePlotTemp2) shows the mean temperature by time of day by season for the data from . Does this look right? The alpha values are suggesting it's getting warmer...
+
+Again, this plot tells us if our dateTime assumptions are correct.
+
+```{r simplePlotTemp2, fig.height=6, fig.cap="Line plot of mean temperature by season and location"}
+# combine the temperature data
+
+message("Note that ", nrow(tempBothDT[is.na(meanTemp)]), " observations have no Tmean(C) values...")
+
+tempBothDT <- tempBothDT[, year := lubridate::year(r_dateTime)]
+t <- addmargins(with(tempBothDT[is.na(meanTemp)], table(location,year)))
+
+kableExtra::kable(t, caption = "Counts of missing temperature observations by location and year (source: 1 file)") %>%
+  kable_styling()
+
+message("But it's mostly in years we don't have HP data for?")
+
+plotDT <- tempBothDT[, .(meanT = mean(meanTemp, na.rm = TRUE)), # crucial otherwise any NA causes the calculation to be NA
+                 keyby = .(hms, season, location, year)]
+
+tempCap <- paste0("Temperature data source: ?? NIWA ??",
+                        "\n Time period: ", min(lubridate::date(tempBothDT$r_dateTimeLocal), na.rm = TRUE),
+                        " to ",
+                         max(lubridate::date(tempBothDT$r_dateTimeLocal), na.rm = TRUE)
+                  )
+  
+ggplot2::ggplot(plotDT, aes(x = hms, y = meanT, colour = season, alpha = year)) +
+  geom_point() +
+  facet_grid(location ~ .) +
+  labs(caption = tempCap)
+```
+
+Now we can directly compare the two sources of temperature data to see if they match. Figure \@ref(fig:matchTemp) does this by linking the two files on `r_dateTimeLocal` and `location` and then plotting the temperature values from each source.
+
+```{r matchTemp, fig.cap="Comparison of temperature data from each source by location"}
+message("N rows of 2 files merged: ", nrow(tempDT))
+message("N rows of alltemp_hourly.csv.gz : ", nrow(tempBothDT))
+
+tempDT <- tempDT[, source := "Separate files"]
+tempBothDT <- tempBothDT[, source := "alltemp_hourly.csv.gz"]
+
+# let's try just comparing dates
+
+t2fdt <- tempDT[, .(dateTime_char_2f = `Date(NZST)`, r_dateTimeLocal, meanTemp_2files = meanTemp, location, hms_2files = hms)]
+setkey(t2fdt, r_dateTimeLocal, location)
+
+t1fdt <- tempBothDT[, .(dateTime_char_1f = r_dateTime, r_dateTimeLocal, meanTemp_1file = meanTemp, location, hms_1file = hms)]
+setkey(t1fdt, r_dateTimeLocal, location)
+
+dt <- t2fdt[t1fdt] # merge on dateTimeLocal & location
+
+ggplot2::ggplot(dt[!is.na(r_dateTimeLocal)], aes(x = meanTemp_2files, 
+                                                 y = meanTemp_1file,
+                                                 colour = lubridate::hour(r_dateTimeLocal))) +
+  geom_point() +
+  facet_grid(. ~ location) +
+  labs(caption = "Comparison of temperature data from each source by location")
+
+# so some of them match but not all
+dt <- dt[, diffTemp := meanTemp_2files - meanTemp_1file]
+
+```
+
+Bang on. As we can see, it makes no differnce which temperture data is used.
+
+## Link the HP and temperature data
+
+So it looks like the date times are OK for both the HP and temperature data and either version of the temperature data is OK too. Now let's try to link the temperature data derivd from the 2 files to the heat pump data using station and r_dateTimeLocal.
+
+```{r link.data}
+tempDT <- data.table::setkey(tempDT, location, r_dateTimeLocal) # set key to link
+tempDT <- tempDT[, hour := lubridate::hour(r_dateTimeLocal)]
+
+hpDT <- data.table::setkey(hpDT, location, r_dateTimeLocal)
+hpDT <- hpDT[, hour := lubridate::hour(r_dateTimeLocal)]
+
+# remove the NA dateTimes before we do
+tempDTclean <- tempDT[!is.na(r_dateTimeLocal)]
+
+linkedDT <- tempDTclean[hpDT] # this will add each row of tempDT to the end of each relevant row of hpDT
+
+```
+
+Now, because we did _not_ match on `hour` we can see if anything failed to match up in terms of time of day. There are (Table \@ref(tab:testLinkedDataHour)) but it looks like they are to do with the missing temperature data as the NAs in the temperature columns (see Table \@ref(tab:headLinkedDataHour)).
+
+```{r testLinkedDataHour}
+
+t <- addmargins(with(linkedDT, table(hour, i.hour, useNA = "always")))
+
+kableExtra::kable(t, caption = "Counts of hours from each source") %>% 
+  kable_styling()
+```
+
+```{r headLinkedDataHour}
+t <- head(linkedDT[is.na(hour)])
+kableExtra::kable(t, caption = "Rows of data where hour (fromtemperature data file) = NA") %>% 
+  kable_styling()
+
+```
+
+# Test relationship between temperature and heat pump demand
+
+So now we think we've linked the data correctly, let's do some exploratory analysis. Following Emily's suggestion we only keep heat pump data where power > 40 and for the circuits we wish to include.
+
+First we just plot all the hourly data for demand vs mean temperature (Figure \@ref(fig:tempDemandScatter)).
+
+```{r tempDemandScatter, fig.cap="Plots of temperature vs demand by season and location"}
+dt <- linkedDT[powerW > 40 & includeCircuit == 1 & !is.na(meanTemp)]
+
+tempCap <- paste0("Temperature data source: ?? NIWA ??")
+
+combinedCaption <- paste0(hpCap, "\n", tempCap)
+
+ggplot2::ggplot(dt, aes(x = meanTemp, y = powerW, alpha = year)) +
+  geom_point() +
+  facet_grid(season ~ location) +
+  labs(caption = paste0(combinedCaption))
+
+```
+
+That doesn't tell us a lot - although these is indeed a suggestion of their use for cooling in summer in both locations. So let's try to create the binned box plots.
+
+```{r tempDemandBoxSeason, fig.cap="Box plots of temperature vs demand by season and location"}
+dt <- linkedDT[powerW > 40 & includeCircuit == 1 & !is.na(meanTemp)]
+
+ggplot2::ggplot(dt, mapping = aes(x = meanTemp, y = powerW)) + 
+  geom_boxplot(aes(cut_width(meanTemp,
+                             width = 2, # change the width to get 'wider' bins
+                             boundary = 0)))  + 
+  facet_grid(season ~ location) +
+  labs(caption = combinedCaption)
+```
+
+Figure \@ref(fig:tempDemandBoxSeason) shows binned box plots of power against demand and suggest more clearly that there is a cooling effect for households in summer - especially in 15876. Or perhaps we should more accurately say there is evidence of a summer cooling effect in the `r uniqueN(linkedDT[location == "15876"]$id)` (!) households who live in 15876. And who would base a claim on that many households?
+
+Anyway, just for good measure lets try to re-create the U shaped plots Emily produced by ignoring season.
+
+```{r tempDemandBox, fig.cap="Box plots of temperature vs demand by season and location"}
+dt <- linkedDT[powerW > 40 & includeCircuit == 1 & !is.na(meanTemp)]
+
+ggplot2::ggplot(dt, mapping = aes(x = meanTemp, y = powerW)) + 
+  geom_boxplot(aes(cut_width(meanTemp,
+                             width = 2, # change the width to get 'wider' bins
+                             boundary = 0)))  + 
+  facet_grid(. ~ location) +
+  labs(caption = combinedCaption)
+```
+
+Yep, can see it!
+
+> If this still does not look right then the only thing left to worry about is whether the heat pump data is actually stored in NZ time - although our profiles suggest it is not.
 
 # Runtime
 
-```{r check runtime}
+```{r check.runtime}
 t <- proc.time() - startTime
 
 elapsed <- t[[3]]
@@ -113,11 +531,10 @@ elapsed <- t[[3]]
 
 Analysis completed in `r elapsed` seconds ( `r round(elapsed/60,2)` minutes) using [knitr](https://cran.r-project.org/package=knitr) in [RStudio](http://www.rstudio.com) with `r R.version.string` running on `r R.version$platform`.
 
-# R environment
+# R packages used
 
 > list packages used & cite
  
-```{r sessionInfo}
-sessionInfo()
-```
+# References
+
 
