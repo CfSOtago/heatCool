@@ -1,6 +1,7 @@
 # Script to run testReport using several options for data input
 
 # set data input
+# this will switch from Emily's Heat Pump data extraction to Ben's
 #dataSource <- "emilyData"
 dataSource <- "benData"
 
@@ -19,10 +20,10 @@ if(myParams$userName == "ben"){ # BA laptop
 }
 
 if(dataSource == "emilyData"){
-  dataFile <- paste0(myParams$dPath, "allHouseholds_hourly.csv.gz")
+  dataFile <- paste0(myParams$dPath, "allHouseholds_hourly.csv.gz") # Emily's full data extract
 }
 if(dataSource == "benData"){
-  dataFile <- "~/Data/NZ_GREENGrid/safe/gridSpy/1min/dataExtracts/Heat Pump_2015-04-01_2016-03-31_observations.csv.gz"
+  dataFile <- "~/Data/NZ_GREENGrid/safe/gridSpy/1min/dataExtracts/Heat Pump_2015-04-01_2016-03-31_observations.csv.gz" # data for 1 year extracted previously
 }
 
 # test file exists
