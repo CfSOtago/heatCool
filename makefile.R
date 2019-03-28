@@ -2,8 +2,8 @@
 
 # set data input
 # this will switch from Emily's Heat Pump data extraction to Ben's
-dataSource <- "emilyData"
-#dataSource <- "benData"
+#dataSource <- "emilyData"
+dataSource <- "benData"
 
 # What are we running on?
 sysInfo <- Sys.info()

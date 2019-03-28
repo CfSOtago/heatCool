@@ -280,7 +280,7 @@ ggplot2::ggplot(plotDT, aes(x = hms, y = meanW, colour = season)) +
 
 ## Temperature
 
-### 2 files
+### Data in 2 files
 
 First we load this using the two seperate files.
 
@@ -326,15 +326,7 @@ message("Looks like the ones around the DST switches. We hate DST almost as much
 
 ```
 
-Now let's look at summaries of the two data files.
-
-```{r testTemp}
-skimr::skim(temp23872DT)
-
-skimr::skim(temp15876DT)
-```
-
-Convert the char values to numeric as needed.
+Convert the incoming character values to numeric as needed.
 
 ```{r checkTempData}
 # combine the temperature data
@@ -373,7 +365,7 @@ ggplot2::ggplot(plotDT, aes(x = hms, y = meanT, colour = season, alpha = year)) 
   labs(caption = tempCap)
 ```
 
-### 1 file
+### Both datasets in 1 file
 
 Now test the single temperature file which contains both.
 
@@ -394,8 +386,6 @@ tempBothDT <- tempBothDT[, r_dateTimeLocal := lubridate::ymd_hms(r_dateTime, # l
   
   tempBothDT <- GREENGridData::addNZSeason(tempBothDT)
   
-skimr::skim(tempBothDT)
-
 tempBothDT$V1 <- NULL
 tempBothDT <- tempBothDT[, meanTemp := Tmean_C]
 
