@@ -127,13 +127,6 @@ kableExtra::kable(head(hpDT, 10), caption = "First 10 rows of (slightly) process
   kable_styling()
 ```
 
-The next table gives a summary of the heat pump data after limited processing (no cleaning). The exact values here will depend on the data source used.
-
-```{r hpSummary}
-skimr::skim(hpDT)
-```
-
-
 Table \@ref(tab:hpCircuitLabels) gives a list of all circuit labels seen - as a check on what we think they are measuring.
 
 Emily's analysis excludes the following circuits:
@@ -317,14 +310,14 @@ fixTempData <- function(dt){
 temp15876DT <- fixTempData(temp15876DT)
 message("Some dates failed to parse - which ones?")
 
-kableExtra::kable(head(temp15876DT[is.na(r_dateTimeLocal)]), 
+kableExtra::kable(head(temp15876DT[is.na(r_dateTimeLocal), .(Station, `Date(NZST)`, r_dateTimeLocal)]), 
                   caption = "Non-parsed dates for location =  15876")
 
 
 temp23872DT <- fixTempData(temp23872DT)
 message("Some dates failed to parse - which ones?")
 
-kableExtra::kable(head(temp23872DT[is.na(r_dateTimeLocal)]), 
+kableExtra::kable(head(temp23872DT[is.na(r_dateTimeLocal), .(Station, `Date(NZST)`, r_dateTimeLocal)]), 
                   caption = "Non-parsed dates for location =  23872")
 
 
