@@ -1,6 +1,9 @@
 ---
+params:
+  dataSource: '' # set in makefile.R
+  dataFile: '' # set in makefile.R
 title: "Electricity Demand for Heating and Cooling in New Zealand"
-subtitle: "Test data"
+subtitle: '`r paste0("Test data source: ", dataSource, " - ", dataFile)`'
 author: "Ben Anderson (ben.anderson@otago.ac.nz, `@dataknut`) & Emily Jiang"
 date: 'Last run at: `r Sys.time()`'
 output:
@@ -37,20 +40,6 @@ This is where we do setup stuff like attaching libraries etc.
 # Set start time ----
 startTime <- proc.time()
 
-# What are we running on?
-sysInfo <- Sys.info()
-myParams <- list()
-myParams$sysName <- sysInfo[[1]]
-myParams$nodeName <- sysInfo[[4]]
-myParams$userName <- sysInfo[[7]]
-
-if(myParams$userName == "ben"){ # BA laptop
-  # myParams$dPath <- path.expand("/Volumes/hum-csafe/Research Projects/GREEN Grid/Self_contained_Projects/2018_coolingEmily/archive/") # HCS - requires VPN/on-campus connection
-  myParams$dPath <- path.expand("~/Data/NZ_GREENGrid/safe/emilyJiang/") # copy of data on HCS
-}else{
-  myParams$dPath <- "Z:/Research Projects/GREEN Grid/Self_contained_Projects/2018_coolingEmily/archive/" # <- windoze
-}
-  
 # Functions ----
 
 # Emily's libraries and functions
@@ -59,6 +48,7 @@ source("../R/functions.R") # Emily's functions
 
 # Local libraries ----
 library(kableExtra) # for fancy tables
+library(skimr) # for data descriptors (skim)
 # any extras?
 
 ```
@@ -74,23 +64,48 @@ sessionInfo()
 
 ## Heat pumps
 
-First we load Emily's processed heat pump data and run some basic tests.
+First we load the selected pre-extracted heat pump data and run some basic tests.
 
 ```{r load.HP.data}
-df <- paste0(myParams$dPath, "allHouseholds_hourly.csv.gz")
+message("Loading", params$dataFile)
+# for testing
+# dataFile <-  paste0(myParams$dPath, "allHouseholds_hourly.csv.gz")
+# dataFile <- "~/Data/NZ_GREENGrid/safe/gridSpy/1min/dataExtracts/Heat Pump_2015-04-01_2016-03-31_observations.csv.gz"
+# hpDT_orig <- data.table::fread(dataFile)
+# params$dataSource <- "benData"
 
-message("Loading", df)
-hpDT <- data.table::fread(df)
 
-# drop V1 (purpose?)
-hpDT$V1 <- NULL
+hpDT_orig <- data.table::fread(params$dataFile)
+
+hpDT <- hpDT_orig
+
+if(params$dataSource == "emilyData"){
+  # drop V1 (purpose?)
+  hpDT$V1 <- NULL
+  # fix the date - remember it's stored as UTC
+  hpDT <- hpDT[, r_dateTimeChar := r_dateTime]
+  hpDT <- hpDT[, r_dateTime := lubridate::as_datetime(r_dateTime)]
+  hpDT <- hpDT[, r_dateTimeLocal := lubridate::with_tz(r_dateTime, tzone = "Pacific/Auckland")] # convert to local time from UTC
+}
+
+if(params$dataSource == "benData"){
+  # minute level observations, needs processing & summarising
+  # calculate hourly mean
+  hpDT <- hpDT[, r_dateTime := lubridate::as_datetime(r_dateTime)] # make sure date set to POSIXct
+  hpDT <- hpDT[, r_dateTimeHour := lubridate::floor_date(r_dateTime, "hour")] # cuts back to hour at the start. I assume this is what Emily did
+  hpDTh <- hpDT[, .(powerW = mean(powerW)), keyby = .(r_dateTime = r_dateTimeHour, circuit, linkID)] # calculate hourly mean power (temperature data is hourly means)
+  # proceed as above
+  hpDTh <- hpDTh[, r_dateTimeLocal := lubridate::with_tz(r_dateTime, tzone = "Pacific/Auckland")] # convert to local time from UTC
+  # merge location table
+  locationDT <- data.table::fread(paste0(myParams$dPath, "locationTable.csv"))
+  setkey(locationDT, linkID)
+  setkey(hpDTh, linkID)
+  hpDT <- hpDTh[locationDT[, .(linkID, location)]]
+  hpDT$id <- hpDT$linkID
+}
+
 
 # location is constant by id so we could just create a table and drop that columhn too but...
-
-# fix the date - remember it's stored as UTC
-hpDT <- hpDT[, r_dateTimeChar := r_dateTime]
-hpDT <- hpDT[, r_dateTime := lubridate::as_datetime(r_dateTime)]
-hpDT <- hpDT[, r_dateTimeLocal := lubridate::with_tz(r_dateTime, tzone = "Pacific/Auckland")] # convert to local time from UTC
 
 hpDT <- hpDT[, hms := hms::as.hms(r_dateTimeLocal)] # useful for plots and for checking we have the right timezone!
 
@@ -112,12 +127,14 @@ kableExtra::kable(head(hpDT, 10), caption = "First 10 rows of (slightly) process
   kable_styling()
 ```
 
-The next table gives a summary of the heat pump data after limited processing (no cleaning) while Table \@ref(tab:hpCircuitLabels) gives a list of all circuit labels seen - as a check on what we think they are measuring.
+The next table gives a summary of the heat pump data after limited processing (no cleaning). The exact values here will depend on the data source used.
 
 ```{r hpSummary}
 skimr::skim(hpDT)
 ```
 
+
+Table \@ref(tab:hpCircuitLabels) gives a list of all circuit labels seen - as a check on what we think they are measuring.
 
 Emily's analysis excludes the following circuits:
 
@@ -125,7 +142,7 @@ Emily's analysis excludes the following circuits:
  * `Bedroom & Lounge Heat Pumps$2741` - why exclude this one?
  * `Theatre Heat Pump$2740`
 
-How many of them are there?
+How many of them are there?  
 
 ```{r hpCircuitLabels}
 
@@ -171,6 +188,20 @@ kableExtra::kable(t, caption = "Heat pump statistics by household") %>%
   kable_styling()
 ```
 
+Table \@ref(tab:hpDateCounts) and Figure \@ref(fig:hpDateCounts) gives the number of households observed for all circuits in each year and season. Small numbers in any given season/year will affect the reliability of the subsequent results. On the basis of this table/plot we may wish to select specific time periods.
+
+```{r hpDateCounts, fig.cap="Count of observed households by year and month"}
+
+
+t <- hpDT[, .(nHouseholds = uniqueN(id),
+              nObs = .N), keyby = .(year = as.factor(lubridate::year(r_dateTimeLocal)), month = lubridate::month(r_dateTimeLocal, label = TRUE))]
+
+kableExtra::kable(t, caption = "Household counts by year and season") %>% 
+  kable_styling()
+
+ggplot2::ggplot(t, aes(x = year, y = month, fill = nHouseholds)) +
+  geom_tile()
+```
 
 Figure \@ref(fig:simpleHistHP) shows the mean heat pump demand by time of day by season. Does this look right?
 
@@ -188,11 +219,24 @@ ggplot2::ggplot(hpDT, aes(x = powerW)) +
        )
 ```
 
+Figure \@ref(fig:simpleHistHPno0) shows same plot but only for power > 0 W (i.e. on standby or heating) and only for the circuits we want to include. Does this look right?
+
+```{r simpleHistHPno0, fig.cap="Histogram mean hourly power demand for Heat Pumps by season and location"}
+
+dt <- hpDT[powerW > 0 & includeCircuit == 1]
+message("Check min power: ", min(dt$powerW))
+ggplot2::ggplot(dt, aes(x = powerW)) +
+  geom_histogram() +
+  facet_grid(location ~ season) +
+  labs(caption = paste0(hpCap, "\n n circuits: ", 
+                        uniqueN(dt$circuit)))
+```
 Figure \@ref(fig:simpleHistHP40) shows same plot but only for power > 40 W and only for the circuits we want to include. Does this look right?
 
 ```{r simpleHistHP40, fig.cap="Histogram mean hourly power demand for Heat Pumps by season and location"}
 
 dt <- hpDT[powerW > 40 & includeCircuit == 1]
+message("Check min power: ", min(dt$powerW))
 ggplot2::ggplot(dt, aes(x = powerW)) +
   geom_histogram() +
   facet_grid(location ~ season) +
@@ -463,62 +507,150 @@ kableExtra::kable(t, caption = "Counts of hours from each source") %>%
 
 ```{r headLinkedDataHour}
 t <- head(linkedDT[is.na(hour)])
-kableExtra::kable(t, caption = "Rows of data where hour (fromtemperature data file) = NA") %>% 
+kableExtra::kable(t, caption = "Rows of data where hour (from temperature data file) = NA") %>% 
   kable_styling()
 
 ```
 
-# Test relationship between temperature and heat pump demand
+# Test relationship between temperature and heat pump demand (all data)
 
-So now we think we've linked the data correctly, let's do some exploratory analysis. Following Emily's suggestion we only keep heat pump data where power > 40 and for the circuits we wish to include.
+So now we think we've linked the data correctly, let's do some exploratory analysis. In this section we keep all the data, including the observations where power < 40 for the circuits we wish to include.
 
-First we just plot all the hourly data for demand vs mean temperature (Figure \@ref(fig:tempDemandScatter)).
+First we just plot all the hourly data for demand vs mean temperature (Figure \@ref(fig:tempDemandScatterAll)).
 
-```{r tempDemandScatter, fig.cap="Plots of temperature vs demand by season and location"}
-dt <- linkedDT[powerW > 40 & includeCircuit == 1 & !is.na(meanTemp)]
+```{r tempDemandScatterAll, fig.cap="Plots of temperature vs demand by season and location"}
+dt <- linkedDT[includeCircuit == 1 & !is.na(meanTemp)]
+
+t <- dt[, .(meanW = mean(powerW),
+            minW = min(powerW),
+            maxW = max(powerW),
+            nObs = .N,
+            nCircuits = uniqueN(circuit),
+            nHouseholds = uniqueN(id)), keyby = .(location)]
+
+kableExtra::kable(t, caption = "Summary power demand statistics (all data)") %>% 
+  kable_styling()
+
+hpCap <- paste0("GREEN Grid Heat Pump circuits, n households = ", uniqueN(dt$id),
+                    "\n Time period: ", min(lubridate::date(dt$r_dateTimeLocal)), 
+                    " to ",
+                    max(lubridate::date(dt$r_dateTimeLocal)),
+                "\n n circuits: ", uniqueN(dt$circuit)
+                )
 
 tempCap <- paste0("Temperature data source: ?? NIWA ??")
 
 combinedCaption <- paste0(hpCap, "\n", tempCap)
 
-ggplot2::ggplot(dt, aes(x = meanTemp, y = powerW, alpha = year)) +
+ggplot2::ggplot(dt, aes(x = meanTemp, y = powerW/1000, colour = id)) +
   geom_point() +
   facet_grid(season ~ location) +
-  labs(caption = paste0(combinedCaption))
+  labs(caption = combinedCaption,
+       x = "Mean temperature",
+       y = "Mean half-hourly kW")
 
 ```
 
-That doesn't tell us a lot - although these is indeed a suggestion of their use for cooling in summer in both locations. So let's try to create the binned box plots.
+That doesn't tell us a lot - although these is indeed a suggestion of their use for cooling in summer in both locations by some households. This should remind us that this analysis is based on a _very small_ sample of households. So let's try to re-create the binned box plots. In this case it is not helpful to distinguish between households but we should be aware that the patterns we see may be driven by just one or two households' behaviour.
 
-```{r tempDemandBoxSeason, fig.cap="Box plots of temperature vs demand by season and location"}
-dt <- linkedDT[powerW > 40 & includeCircuit == 1 & !is.na(meanTemp)]
-
-ggplot2::ggplot(dt, mapping = aes(x = meanTemp, y = powerW)) + 
+```{r tempDemandBoxSeasonAll, fig.cap="Box plots of temperature vs demand by season and location"}
+ggplot2::ggplot(dt, mapping = aes(x = meanTemp, y = powerW/1000)) + 
   geom_boxplot(aes(cut_width(meanTemp,
                              width = 2, # change the width to get 'wider' bins
                              boundary = 0)))  + 
   facet_grid(season ~ location) +
-  labs(caption = combinedCaption)
+  labs(caption = combinedCaption,
+       x = "Mean temperature",
+       y = "Mean half-hourly kW")
 ```
 
-Figure \@ref(fig:tempDemandBoxSeason) shows binned box plots of power against demand and suggest more clearly that there is a cooling effect for households in summer - especially in 15876. Or perhaps we should more accurately say there is evidence of a summer cooling effect in the `r uniqueN(linkedDT[location == "15876"]$id)` (!) households who live in 15876. And who would base a claim on that many households?
+Figure \@ref(fig:tempDemandBoxSeasonAll) shows binned box plots of power against demand and suggest more clearly that there is a cooling effect for households in summer - especially in 15876. Or perhaps we should more accurately say there is evidence of a summer cooling effect in the `r uniqueN(linkedDT[location == "15876"]$id)` (!) households who live in 15876. And who would base a claim on that many households?
 
 Anyway, just for good measure lets try to re-create the U shaped plots Emily produced by ignoring season.
 
-```{r tempDemandBox, fig.cap="Box plots of temperature vs demand by season and location"}
-dt <- linkedDT[powerW > 40 & includeCircuit == 1 & !is.na(meanTemp)]
-
-ggplot2::ggplot(dt, mapping = aes(x = meanTemp, y = powerW)) + 
+```{r tempDemandBoxAll, fig.cap="Box plots of temperature vs demand by season and location"}
+ggplot2::ggplot(dt, mapping = aes(x = meanTemp, y = powerW/1000)) + 
   geom_boxplot(aes(cut_width(meanTemp,
                              width = 2, # change the width to get 'wider' bins
                              boundary = 0)))  + 
   facet_grid(. ~ location) +
-  labs(caption = combinedCaption)
+  labs(caption = combinedCaption,
+       x = "Mean temperature",
+       y = "Mean half-hourly kW")
 ```
 
-Yep, can see it!
+Although we can clearly see the increased demand for heat as temperatures decline below 0, the increase in the upper temperature ranges is probably obscured by the large number of zero values. It is arguable whether leaving the zeros out is valid since they could be interpreted as reflecting a household's lack of need for cooling. Were we to only include values > 40 W (to exclude 0 and standby power values) we would be analysing (and subsequently modelling) only those households who actually responded to the temperature change by demanding cooling - which will not be the case for all households in the population.
 
-> If this still does not look right then the only thing left to worry about is whether the heat pump data is actually stored in NZ time - although our profiles suggest it is not.
+
+# Test relationship between temperature and heat pump demand (filtered data)
+
+Notwithstanding the previous argument re data exclusion, in this section we test Emily's suggestion to only keep heat pump data where power > 40 for the circuits we wish to include.
+
+First we just plot all the hourly data for demand vs mean temperature (Figure \@ref(fig:tempDemandScatterFiltered)).
+
+```{r tempDemandScatterFiltered, fig.cap="Plots of temperature vs demand by season and location"}
+dt <- linkedDT[powerW > 40 & includeCircuit == 1 & !is.na(meanTemp)]
+
+t <- dt[, .(meanW = mean(powerW),
+            minW = min(powerW),
+            maxW = max(powerW),
+            nObs = .N,
+            nCircuits = uniqueN(circuit),
+            nHouseholds = uniqueN(id)), keyby = .(location)]
+
+kableExtra::kable(t, caption = "Summary power demand staistics (filtered)") %>% 
+  kable_styling()
+
+tempCap <- paste0("Temperature data source: ?? NIWA ??")
+
+combinedCaption <- paste0(hpCap, "\n", tempCap)
+
+ggplot2::ggplot(dt, aes(x = meanTemp, y = powerW/1000, colour = id)) +
+  geom_point() +
+  facet_grid(season ~ location) +
+  labs(caption = combinedCaption,
+       x = "Mean temperature",
+       y = "Mean half-hourly kW")
+
+```
+
+Again, that doesn't tell us a lot - although these is indeed a suggestion of their use for cooling in summer in both locations. So let's re-try to create the binned box plots.
+
+```{r tempDemandBoxSeasonFiltered, fig.cap="Box plots of temperature vs demand by season and location"}
+ggplot2::ggplot(dt, mapping = aes(x = meanTemp, y = powerW/1000)) + 
+  geom_boxplot(aes(cut_width(meanTemp,
+                             width = 2, # change the width to get 'wider' bins
+                             boundary = 0)))  + 
+  facet_grid(season ~ location) +
+  labs(caption = combinedCaption,
+       x = "Mean temperature",
+       y = "Mean half-hourly kW")
+```
+
+Figure \@ref(fig:tempDemandBoxSeasonFiltered) shows binned box plots of power against demand. As we would expect, the plot suggests more clearly that there is a cooling effect for households in summer when we remove 0 and power < 40 W values.
+
+Anyway, lets again try to re-create the U shaped plots Emily produced by ignoring season.
+
+```{r tempDemandBox, fig.cap="Box plots of temperature vs demand by season and location"}
+ggplot2::ggplot(dt, mapping = aes(x = meanTemp, y = powerW/1000)) + 
+  geom_boxplot(aes(cut_width(meanTemp,
+                             width = 2, # change the width to get 'wider' bins
+                             boundary = 0)))  + 
+  facet_grid(. ~ location) +
+  labs(caption = combinedCaption,
+       x = "Mean temperature",
+       y = "Mean half-hourly kW")
+```
+
+The increase in demand for power as the temperature rises is now clearer.
+
+> But this is fairly obvious since we are just looking at the households who responded to the temperature changes...
+
+# Modelling
+
+tbc
+
+> Needs to include the 0 values (see discussion above)?
 
 # Runtime
 
@@ -534,6 +666,48 @@ Analysis completed in `r elapsed` seconds ( `r round(elapsed/60,2)` minutes) usi
 
 > list packages used & cite
  
+# Data codebooks
+
+## Original power data (before processing)
+
+Depending on input files choice this will vary.
+
+ * data source: `r params$dataSource`
+ * data file: ``r params$dataFile`
+
+```{r skimHPorig}
+head(hpDT_orig)
+
+skimr::skim(hpDT_orig)
+```
+
+
+## Power data (after processing)
+
+```{r skimHP}
+skimr::skim(hpDT)
+```
+
+## Original temperature file(s)
+
+File 1:
+
+```{r skimT1}
+skimr::skim(temp15876DT)
+```
+
+File 2:
+
+```{r skimT2}
+skimr::skim(temp23872DT)
+```
+
+Combined file:
+
+```{r skimTBoth}
+skimr::skim(tempBothDT)
+```
+
 # References
 
 
