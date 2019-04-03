@@ -40,16 +40,20 @@ This is where we do setup stuff like attaching libraries etc.
 # Set start time ----
 startTime <- proc.time()
 
-# Functions ----
+# Libraries ----
+library(here)
+projRoot <- here::here()
 
 # Emily's libraries and functions
-source("../R/libraries.R") # Emily's recommended libraries
-source("../R/functions.R") # Emily's functions
+source(paste0(projRoot, "/R/libraries.R")) # Emily's recommended libraries
+source(paste0(projRoot, "/R/functions.R")) # Emily's functions
 
 # Local libraries ----
 library(kableExtra) # for fancy tables
 library(skimr) # for data descriptors (skim)
 # any extras?
+
+# Local functions ----
 
 ```
 
@@ -68,12 +72,18 @@ First we load the selected pre-extracted heat pump data and run some basic tests
 
 ```{r load.HP.data}
 message("Loading", params$dataFile)
-# for testing
-# dataFile <-  paste0(myParams$dPath, "allHouseholds_hourly.csv.gz")
-# dataFile <- "~/Data/NZ_GREENGrid/safe/gridSpy/1min/dataExtracts/Heat Pump_2015-04-01_2016-03-31_observations.csv.gz"
-# hpDT_orig <- data.table::fread(dataFile)
-# params$dataSource <- "benData"
 
+isTesting <- 0
+
+# for testing ----
+#isTesting <- 1
+
+if(isTesting){
+  params <- list() # gets set by knit
+ #params$dataFile <-  paste0(myParams$dPath, "allHouseholds_hourly.csv.gz")
+ params$dataFile <- "~/Data/NZ_GREENGrid/safe/gridSpy/1min/dataExtracts/Heat Pump_2015-04-01_2016-03-31_observations.csv.gz"
+ params$dataSource <- "benData"
+}
 
 hpDT_orig <- data.table::fread(params$dataFile)
 
@@ -127,26 +137,33 @@ kableExtra::kable(head(hpDT, 10), caption = "First 10 rows of (slightly) process
   kable_styling()
 ```
 
-Table \@ref(tab:hpCircuitLabels) gives a list of all circuit labels seen - as a check on what we think they are measuring.
+Table \@ref(tab:hpExclusions) gives a list of all circuit labels seen - as a check on what we think they are measuring.
 
-Emily's analysis excludes the following circuits:
+In addition, Emily's analysis excludes the following circuits:
 
- * `Downstairs (inc 1 Heat Pump)$2212`
- * `Bedroom & Lounge Heat Pumps$2741` - why exclude this one?
- * `Theatre Heat Pump$2740`
+ * `Downstairs (inc 1 Heat Pump)$2212` - this may well include a number of other appliances;
+ * `Bedroom & Lounge Heat Pumps$2741` - appears to have many zero values in winter at low temperatures but so do others (see Figure \@ref(fig:powerTempByID));
+ * `Theatre Heat Pump$2740` - generally low level of use (see Figure \@ref(fig:powerTempByID));
 
-How many of them are there?  
+How many of them are there? Here we create two filters - one based on Emily's suggestions (3 exclusions as above) and one which allows `Bedroom & Lounge Heat Pumps$2741`.
 
-```{r hpCircuitLabels}
+```{r hpExclusions}
 
 # flag the circuits we don't want
-hpDT <- hpDT[, includeCircuit := ifelse(circuit == "Downstairs (inc 1 Heat Pump)$2212" |
+hpDT <- hpDT[, ej_includeCircuit := ifelse(circuit == "Downstairs (inc 1 Heat Pump)$2212" |
                                           circuit == "Bedroom & Lounge Heat Pumps$2741" | # why exclude this one?
                                           circuit == "Theatre Heat Pump$2740",
                                         0, # exclude 
                                         1)] # sets all others to 1
 
-t <- table(hpDT$circuit, hpDT$includeCircuit)
+# flag the circuits we don't want
+hpDT <- hpDT[, ba_includeCircuit := ifelse(circuit == "Downstairs (inc 1 Heat Pump)$2212" |
+                                          circuit == "Theatre Heat Pump$2740",
+                                        0, # exclude 
+                                        1)] # sets all others to 1
+
+
+t <- hpDT[, .(nObs = .N), keyby = .(ej_includeCircuit, ba_includeCircuit, circuit)]
 
 kableExtra::kable(t, caption = "Counts of circuit labels for those we exclude (0) and those we include (1)") %>% 
   kable_styling()
@@ -212,11 +229,11 @@ ggplot2::ggplot(hpDT, aes(x = powerW)) +
        )
 ```
 
-Figure \@ref(fig:simpleHistHPno0) shows same plot but only for power > 0 W (i.e. on standby or heating) and only for the circuits we want to include. Does this look right?
+Figure \@ref(fig:simpleHistHPno0) shows same plot but only for power > 0 W (i.e. on standby or heating) and only for the circuits BA suggests we include (all but 2 - see Table \@ref(tab:hpExclusions)). Does this look right?
 
 ```{r simpleHistHPno0, fig.cap="Histogram mean hourly power demand for Heat Pumps by season and location"}
 
-dt <- hpDT[powerW > 0 & includeCircuit == 1]
+dt <- hpDT[powerW > 0 & ba_includeCircuit == 1]
 message("Check min power: ", min(dt$powerW))
 ggplot2::ggplot(dt, aes(x = powerW)) +
   geom_histogram() +
@@ -224,11 +241,12 @@ ggplot2::ggplot(dt, aes(x = powerW)) +
   labs(caption = paste0(hpCap, "\n n circuits: ", 
                         uniqueN(dt$circuit)))
 ```
-Figure \@ref(fig:simpleHistHP40) shows same plot but only for power > 40 W and only for the circuits we want to include. Does this look right?
+
+Figure \@ref(fig:simpleHistHP40) shows same plot but only for power > 40 W and only for the circuits BA suggests we include. Does this look right?
 
 ```{r simpleHistHP40, fig.cap="Histogram mean hourly power demand for Heat Pumps by season and location"}
 
-dt <- hpDT[powerW > 40 & includeCircuit == 1]
+dt <- hpDT[powerW > 40 & ba_includeCircuit == 1]
 message("Check min power: ", min(dt$powerW))
 ggplot2::ggplot(dt, aes(x = powerW)) +
   geom_histogram() +
@@ -237,7 +255,7 @@ ggplot2::ggplot(dt, aes(x = powerW)) +
                         uniqueN(dt$circuit)))
 ```
 
-Figure \@ref(fig:simpleLineHP) shows the mean heat pump demand by time of day by season for the circuits we want to include. Does this look right?
+Figure \@ref(fig:simpleLineHP) shows the mean heat pump demand (no power value exclusions) by time of day by season for the circuits BA suggests we include. Does this look right?
 
 Figure \@ref(fig:simpleLineHP) is important because:
 
@@ -247,7 +265,7 @@ Figure \@ref(fig:simpleLineHP) is important because:
 
 
 ```{r simpleLineHP, fig.cap="Line plot of mean power demand for Heat Pumps by season and location"}
-dt <- hpDT[includeCircuit == 1]
+dt <- hpDT[ba_includeCircuit == 1]
 
 plotDT <- dt[, .(meanW = mean(powerW)), keyby = .(hms, season, location)]
 
@@ -264,7 +282,7 @@ Are we seeing some cooling in summer?
 We can repeat this plot including only powerW values > 40 W (Figure \@ref(fig:simpleLineHP40)). This shows the level of demand _when they are on_. This plot shows some distinct signs of heat pump use in early evenings in summer producing a slightly earlier 'peak' than is the case for winter heating. It has to be said however that the plots are quite messy, no doubt due to the small numbers involved.
 
 ```{r simpleLineHP40, fig.cap="Line plot of mean power demand for Heat Pumps by season and location where power > 40W"}
-dt <- hpDT[powerW > 40 & includeCircuit == 1]
+dt <- hpDT[powerW > 40 & ba_includeCircuit == 1]
   
 plotDT <-dt[, .(meanW = mean(powerW)), keyby = .(hms, season, location)]
 
@@ -495,16 +513,18 @@ kableExtra::kable(t, caption = "Rows of data where hour (from temperature data f
 
 ```
 
-# Test relationship between temperature and heat pump demand (all data)
+# Test relationship between temperature and heat pump demand (BA filtered data)
 
-So now we think we've linked the data correctly, let's do some exploratory analysis. In this section we keep all the data, including the observations where power < 40 for the circuits we wish to include.
+So now we think we've linked the data correctly, let's do some exploratory analysis. In this section we keep the observations where power < 40 for the circuits defined in `ba_includeCircuit` (see Table \@ref(tab:hpExclusions)).
 
-First we just plot all the hourly data for demand vs mean temperature (Figure \@ref(fig:tempDemandScatterAll)).
+First we just plot all the hourly data for demand vs mean temperature (Figure \@ref(fig:tempDemandScatterBaFiltered)).
 
-```{r tempDemandScatterAll, fig.cap="Plots of temperature vs demand by season and location"}
-dt <- linkedDT[includeCircuit == 1 & !is.na(meanTemp)]
+```{r tempDemandScatterBaFiltered, fig.cap="Plots of temperature vs demand by season and location"}
 
-t <- dt[, .(meanW = mean(powerW),
+baFilteredDT <- linkedDT[ ba_includeCircuit == 1 & !is.na(meanTemp)]
+
+
+t <- baFilteredDT[, .(meanW = mean(powerW),
             minW = min(powerW),
             maxW = max(powerW),
             nObs = .N,
@@ -514,18 +534,19 @@ t <- dt[, .(meanW = mean(powerW),
 kableExtra::kable(t, caption = "Summary power demand statistics (all data)") %>% 
   kable_styling()
 
-hpCap <- paste0("GREEN Grid Heat Pump circuits, n households = ", uniqueN(dt$id),
-                    "\n Time period: ", min(lubridate::date(dt$r_dateTimeLocal)), 
+hpCap <- paste0("GREEN Grid Heat Pump circuits, n households = ", uniqueN(baFilteredDT$id),
+                    "\n Time period: ", min(lubridate::date(baFilteredDT$r_dateTimeLocal)), 
                     " to ",
-                    max(lubridate::date(dt$r_dateTimeLocal)),
-                "\n n circuits: ", uniqueN(dt$circuit)
+                    max(lubridate::date(baFilteredDT$r_dateTimeLocal)),
+                "\n n circuits: ", uniqueN(baFilteredDT$circuit)
                 )
 
 tempCap <- paste0("Temperature data source: ?? NIWA ??")
 
 combinedCaption <- paste0(hpCap, "\n", tempCap)
 
-ggplot2::ggplot(dt, aes(x = meanTemp, y = powerW/1000, colour = id)) +
+ggplot2::ggplot(baFilteredDT[!is.na(meanTemp)],
+                aes(x = meanTemp, y = powerW/1000, colour = id)) +
   geom_point() +
   facet_grid(season ~ location) +
   labs(caption = combinedCaption,
@@ -536,8 +557,9 @@ ggplot2::ggplot(dt, aes(x = meanTemp, y = powerW/1000, colour = id)) +
 
 That doesn't tell us a lot - although these is indeed a suggestion of their use for cooling in summer in both locations by some households. This should remind us that this analysis is based on a _very small_ sample of households. So let's try to re-create the binned box plots. In this case it is not helpful to distinguish between households but we should be aware that the patterns we see may be driven by just one or two households' behaviour.
 
-```{r tempDemandBoxSeasonAll, fig.cap="Box plots of temperature vs demand by season and location"}
-ggplot2::ggplot(dt, mapping = aes(x = meanTemp, y = powerW/1000)) + 
+```{r tempDemandBoxSeasonBaFiltered, fig.cap="Box plots of temperature vs demand by season and location"}
+ggplot2::ggplot(linkedDT[!is.na(meanTemp)],
+                         mapping = aes(x = meanTemp, y = powerW/1000)) + 
   geom_boxplot(aes(cut_width(meanTemp,
                              width = 2, # change the width to get 'wider' bins
                              boundary = 0)))  + 
@@ -547,12 +569,12 @@ ggplot2::ggplot(dt, mapping = aes(x = meanTemp, y = powerW/1000)) +
        y = "Mean half-hourly kW")
 ```
 
-Figure \@ref(fig:tempDemandBoxSeasonAll) shows binned box plots of power against demand and suggest more clearly that there is a cooling effect for households in summer - especially in 15876. Or perhaps we should more accurately say there is evidence of a summer cooling effect in the `r uniqueN(linkedDT[location == "15876"]$id)` (!) households who live in 15876. And who would base a claim on that many households?
+Figure \@ref(fig:tempDemandBoxSeasonBaFiltered) shows binned box plots of power against demand and suggest more clearly that there is a cooling effect for households in summer - especially in 15876. Or perhaps we should more accurately say there is evidence of a summer cooling effect in the `r uniqueN(linkedDT[location == "15876"]$id)` (!) households who live in 15876. And who would base a claim on that many households?
 
 Anyway, just for good measure lets try to re-create the U shaped plots Emily produced by ignoring season.
 
-```{r tempDemandBoxAll, fig.cap="Box plots of temperature vs demand by season and location"}
-ggplot2::ggplot(dt, mapping = aes(x = meanTemp, y = powerW/1000)) + 
+```{r tempDemandBoxBaFiltered, fig.cap="Box plots of temperature vs demand by season and location"}
+ggplot2::ggplot(linkedDT[!is.na(meanTemp)], mapping = aes(x = meanTemp, y = powerW/1000)) + 
   geom_boxplot(aes(cut_width(meanTemp,
                              width = 2, # change the width to get 'wider' bins
                              boundary = 0)))  + 
@@ -565,16 +587,16 @@ ggplot2::ggplot(dt, mapping = aes(x = meanTemp, y = powerW/1000)) +
 Although we can clearly see the increased demand for heat as temperatures decline below 0, the increase in the upper temperature ranges is probably obscured by the large number of zero values. It is arguable whether leaving the zeros out is valid since they could be interpreted as reflecting a household's lack of need for cooling. Were we to only include values > 40 W (to exclude 0 and standby power values) we would be analysing (and subsequently modelling) only those households who actually responded to the temperature change by demanding cooling - which will not be the case for all households in the population.
 
 
-# Test relationship between temperature and heat pump demand (filtered data)
+# Test relationship between temperature and heat pump demand (EJ filtered data)
 
-Notwithstanding the previous argument re data exclusion, in this section we test Emily's suggestion to only keep heat pump data where power > 40 for the circuits we wish to include.
+Notwithstanding the previous argument re data exclusion, in this section we test Emily's suggestion to only keep heat pump data where power > 40 for the circuits defined in `ēj_includeCircuit` (see Table \@ref(tab:hpExclusions)).
 
-First we just plot all the hourly data for demand vs mean temperature (Figure \@ref(fig:tempDemandScatterFiltered)).
+First we just plot all the hourly data for demand vs mean temperature (Figure \@ref(fig:tempDemandScatterEjFiltered)).
 
-```{r tempDemandScatterFiltered, fig.cap="Plots of temperature vs demand by season and location"}
-dt <- linkedDT[powerW > 40 & includeCircuit == 1 & !is.na(meanTemp)]
+```{r tempDemandScatterEjFiltered, fig.cap="Plots of temperature vs demand by season and location"}
+ejFilteredDT <- linkedDT[powerW > 40 & ej_includeCircuit == 1 & !is.na(meanTemp)]
 
-t <- dt[, .(meanW = mean(powerW),
+t <- ejFilteredDT[, .(meanW = mean(powerW),
             minW = min(powerW),
             maxW = max(powerW),
             nObs = .N,
@@ -584,11 +606,18 @@ t <- dt[, .(meanW = mean(powerW),
 kableExtra::kable(t, caption = "Summary power demand staistics (filtered)") %>% 
   kable_styling()
 
+hpCap <- paste0("GREEN Grid Heat Pump circuits, n households = ", uniqueN(ejFilteredDT$id),
+                    "\n Time period: ", min(lubridate::date(ejFilteredDT$r_dateTimeLocal)), 
+                    " to ",
+                    max(lubridate::date(ejFilteredDT$r_dateTimeLocal)),
+                "\n n circuits: ", uniqueN(ejFilteredDT$circuit)
+                )
+
 tempCap <- paste0("Temperature data source: ?? NIWA ??")
 
 combinedCaption <- paste0(hpCap, "\n", tempCap)
 
-ggplot2::ggplot(dt, aes(x = meanTemp, y = powerW/1000, colour = id)) +
+ggplot2::ggplot(ejFilteredDT, aes(x = meanTemp, y = powerW/1000, colour = id)) +
   geom_point() +
   facet_grid(season ~ location) +
   labs(caption = combinedCaption,
@@ -599,8 +628,8 @@ ggplot2::ggplot(dt, aes(x = meanTemp, y = powerW/1000, colour = id)) +
 
 Again, that doesn't tell us a lot - although these is indeed a suggestion of their use for cooling in summer in both locations. So let's re-try to create the binned box plots.
 
-```{r tempDemandBoxSeasonFiltered, fig.cap="Box plots of temperature vs demand by season and location"}
-ggplot2::ggplot(dt, mapping = aes(x = meanTemp, y = powerW/1000)) + 
+```{r tempDemandBoxSeasonEjFiltered, fig.cap="Box plots of temperature vs demand by season and location"}
+ggplot2::ggplot(ejFilteredDT, mapping = aes(x = meanTemp, y = powerW/1000)) + 
   geom_boxplot(aes(cut_width(meanTemp,
                              width = 2, # change the width to get 'wider' bins
                              boundary = 0)))  + 
@@ -610,12 +639,12 @@ ggplot2::ggplot(dt, mapping = aes(x = meanTemp, y = powerW/1000)) +
        y = "Mean half-hourly kW")
 ```
 
-Figure \@ref(fig:tempDemandBoxSeasonFiltered) shows binned box plots of power against demand. As we would expect, the plot suggests more clearly that there is a cooling effect for households in summer when we remove 0 and power < 40 W values.
+Figure \@ref(fig:tempDemandBoxSeasonEjFiltered) shows binned box plots of power against demand. As we would expect, the plot suggests more clearly that there is a cooling effect for households in summer when we remove 0 and power < 40 W values.
 
 Anyway, lets again try to re-create the U shaped plots Emily produced by ignoring season.
 
-```{r tempDemandBox, fig.cap="Box plots of temperature vs demand by season and location"}
-ggplot2::ggplot(dt, mapping = aes(x = meanTemp, y = powerW/1000)) + 
+```{r tempDemandBoxEjFiltered, fig.cap="Box plots of temperature vs demand by season and location"}
+ggplot2::ggplot(ejFilteredDT, mapping = aes(x = meanTemp, y = powerW/1000)) + 
   geom_boxplot(aes(cut_width(meanTemp,
                              width = 2, # change the width to get 'wider' bins
                              boundary = 0)))  + 
@@ -635,6 +664,8 @@ tbc
 
 > Needs to include the 0 values (see discussion above)?
 
+> If the regression model assumes independence of observations then this is violated if we have multiple observations for each house (which we do whether we just use the ‘best’ year or not…). The short-term fix would be to use robust standard errors in model reporting or maybe a fixed-effects model (?) but that might be well beyond scope of the report!
+
 # Runtime
 
 ```{r check.runtime}
@@ -649,9 +680,23 @@ Analysis completed in `r elapsed` seconds ( `r round(elapsed/60,2)` minutes) usi
 
 > list packages used & cite
  
-# Data codebooks
+# Annexes
 
-## Original power data (before processing)
+## Detailed statistics
+
+Figure \@ref(fig:powerTempByID) shows the relationship between mean temperature and mean power for all hourly observations for all circuits colour coded by season. Smoothed fit lines have been added using `mgcv:gam()` curves due to the size of the dataset (see `?geom_smooth` and [@ggplot]).
+
+```{r powerTempByID, fig.cap="Pairs plot of temperature vs heat pump power demand for all households"}
+ggplot2::ggplot(linkedDT, aes(x = meanTemp, y = powerW, colour = season)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth() +
+  facet_wrap(. ~ circuit)
+
+```
+
+## Data codebooks
+
+### Original power data (before processing)
 
 Depending on input files choice this will vary.
 
@@ -665,13 +710,13 @@ skimr::skim(hpDT_orig)
 ```
 
 
-## Power data (after processing)
+### Power data (after processing)
 
 ```{r skimHP}
 skimr::skim(hpDT)
 ```
 
-## Original temperature file(s)
+### Original temperature file(s)
 
 File 1:
 
