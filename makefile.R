@@ -15,7 +15,7 @@ myParams$userName <- sysInfo[[7]]
 if(myParams$userName == "ben"){ # BA laptop
   # myParams$dPath <- path.expand("/Volumes/hum-csafe/Research Projects/GREEN Grid/Self_contained_Projects/2018_coolingEmily/archive/") # HCS - requires VPN/on-campus connection
   myParams$dPath <- path.expand("~/Data/NZ_GREENGrid/safe/emilyJiang/") # copy of data on HCS
-}else{
+}else{ # probably EJ pc
   myParams$dPath <- "Z:/Research Projects/GREEN Grid/Self_contained_Projects/2018_coolingEmily/archive/" # <- windoze
 }
 
