@@ -30,17 +30,21 @@ if(dataSource == "benData"){
 if(file.exists(dataFile)){
   message("Success! Found expected pre-extracted file: ", dataFile)
 } else {
-  message("Opps. Didn't find expected pre-extracted file: ", dataFile)
+  message("Oops. Didn't find expected pre-extracted file: ", dataFile)
   stop("Please check you have set the paths and filename correctly...")
 }
 
-rmdFile <- paste0(getwd(), "/analysis/testReport_v1.0.Rmd") # assumes you're running in the repo root - beware!
+library(here)
+repoRoot <- here::here() # work out where the repo lives in the local file system
 
+rmdFile <- 
 # load libs we need to run
 library(rmarkdown)
 library(bookdown)
-rmarkdown::render(input = rmdFile,
+
+# this will run the analysis in the specified input file and create the specified html output file
+rmarkdown::render(input = paste0(repoRoot, "/analysis/testReport_v1.0.Rmd"), # assumes you opened the RStudio project
                   output_format = "html_document2",
                   params = list(dataSource = dataSource, dataFile = dataFile),
-                  output_file = paste0(getwd(), "/testReport_v1.0_", dataSource, ".html") # NB: this is relative to the .Rmd file
+                  output_file = paste0(repoRoot, "/analysis/testReport_v1.0_", dataSource, ".html") # NB: this is relative to the .Rmd file
 )
