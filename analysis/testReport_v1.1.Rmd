@@ -670,8 +670,8 @@ summary(lmTemp)
 But I realise I I can't use each point to model the overall trend - need to use mean or median powerW at each temperature.
 
 So here I've made a table with the temp, mean power for that temp, and median power for that temp which can be used to model the overall trend.
-``` {r help}
-help <- function(dt, temp, width){
+``` {r modelDT}
+createMeanMedianPower <- function(dt, temp, width){
   newDT <- dt[temp - 0.5*width <= dt$meanTemp & dt$meanTemp < temp + 0.5*width]
   meanTempMeanPower <- mean(newDT$powerW, na.rm = T)
   meanTempMedianPower <- median(newDT$powerW, na.rm = T)
@@ -681,7 +681,7 @@ help <- function(dt, temp, width){
 }
 
 modelDT <- rbindlist(lapply(seq(min(ejFilteredDT$meanTemp), max(ejFilteredDT$meanTemp), 1), function(l){
-      return(help(ejFilteredDT, l, 1))
+      return(createMeanMedianPower(ejFilteredDT, l, 1))
     }))
 ```
 
