@@ -37,7 +37,6 @@ if(file.exists(dataFile)){
 library(here)
 repoRoot <- here::here() # work out where the repo lives in the local file system
 
-rmdFile <- 
 # load libs we need to run
 library(rmarkdown)
 library(bookdown)
