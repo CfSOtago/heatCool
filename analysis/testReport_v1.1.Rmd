@@ -702,7 +702,7 @@ Here I am making the linear model part for the median.
 
 Here I am making the fit of the models (both mean and median).
 ``` {R fitted}
-modelDT <- cbind(modelDT, meanPowerFit = fitted(lmMeanPowerW), medianPowerFit = fitted(lmMedianPowerW))
+modelDT <- cbind(modelDT, meanPowerWFit = fitted(lmMeanPowerW), medianPowerWFit = fitted(lmMedianPowerW))
 modelDT
 
 ```
