@@ -193,7 +193,7 @@ $(document).ready(function () {
 <h1 class="title toc-ignore">Electricity Demand for Heating and Cooling in New Zealand</h1>
 <h3 class="subtitle">Test data source: emilyData - Z:/Research Projects/GREEN Grid/Self_contained_Projects/2018_coolingEmily/archive/allHouseholds_hourly.csv.gz</h3>
 <h4 class="author">Ben Anderson (<a href="mailto:ben.anderson@otago.ac.nz">ben.anderson@otago.ac.nz</a>, <code>@dataknut</code>) &amp; Emily Jiang</h4>
-<h4 class="date">Last run at: 2019-04-24 16:10:15</h4>
+<h4 class="date">Last run at: 2019-04-25 10:45:43</h4>
 
 </div>
 
@@ -209,13 +209,113 @@ library(here)
 projRoot &lt;- here::here()
 
 # Emily's libraries and functions
-source(paste0(projRoot, &quot;/R/libraries.R&quot;))  # Emily's recommended libraries
-source(paste0(projRoot, &quot;/R/functions_v1.1.R&quot;))  # Emily's functions
+source(paste0(projRoot, &quot;/R/libraries.R&quot;))  # Emily's recommended libraries</code></pre>
+<pre><code>## Warning: package 'devtools' was built under R version 3.5.3</code></pre>
+<pre><code>## Warning: package 'usethis' was built under R version 3.5.3</code></pre>
+<pre><code>## Warning: package 'readr' was built under R version 3.5.3</code></pre>
+<pre><code>## Warning: package 'dplyr' was built under R version 3.5.3</code></pre>
+<pre><code>## 
+## Attaching package: 'dplyr'</code></pre>
+<pre><code>## The following objects are masked from 'package:stats':
+## 
+##     filter, lag</code></pre>
+<pre><code>## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union</code></pre>
+<pre><code>## Warning: package 'ggplot2' was built under R version 3.5.3</code></pre>
+<pre><code>## 
+## Attaching package: 'gridExtra'</code></pre>
+<pre><code>## The following object is masked from 'package:dplyr':
+## 
+##     combine</code></pre>
+<pre><code>## 
+## Attaching package: 'lubridate'</code></pre>
+<pre><code>## The following object is masked from 'package:here':
+## 
+##     here</code></pre>
+<pre><code>## The following object is masked from 'package:base':
+## 
+##     date</code></pre>
+<pre><code>## Warning: package 'data.table' was built under R version 3.5.3</code></pre>
+<pre><code>## data.table 1.12.2 using 2 threads (see ?getDTthreads).  Latest news: r-datatable.com</code></pre>
+<pre><code>## 
+## Attaching package: 'data.table'</code></pre>
+<pre><code>## The following objects are masked from 'package:lubridate':
+## 
+##     hour, isoweek, mday, minute, month, quarter, second, wday,
+##     week, yday, year</code></pre>
+<pre><code>## The following objects are masked from 'package:dplyr':
+## 
+##     between, first, last</code></pre>
+<pre><code>## Warning: replacing previous import 'data.table::last' by 'dplyr::last' when
+## loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'data.table::first' by 'dplyr::first'
+## when loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'data.table::between' by
+## 'dplyr::between' when loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'data.table::month' by
+## 'lubridate::month' when loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'data.table::hour' by 'lubridate::hour'
+## when loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'dplyr::intersect' by
+## 'lubridate::intersect' when loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'data.table::quarter' by
+## 'lubridate::quarter' when loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'data.table::week' by 'lubridate::week'
+## when loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'data.table::year' by 'lubridate::year'
+## when loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'dplyr::union' by 'lubridate::union'
+## when loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'hms::hms' by 'lubridate::hms' when
+## loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'data.table::wday' by 'lubridate::wday'
+## when loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'data.table::second' by
+## 'lubridate::second' when loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'dplyr::setdiff' by 'lubridate::setdiff'
+## when loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'data.table::minute' by
+## 'lubridate::minute' when loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'data.table::mday' by 'lubridate::mday'
+## when loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'data.table::yday' by 'lubridate::yday'
+## when loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'data.table::isoweek' by
+## 'lubridate::isoweek' when loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'data.table::melt' by 'reshape2::melt'
+## when loading 'GREENGridData'</code></pre>
+<pre><code>## Warning: replacing previous import 'data.table::dcast' by 'reshape2::dcast'
+## when loading 'GREENGridData'</code></pre>
+<pre><code>## 
+## Attaching package: 'GREENGridData'</code></pre>
+<pre><code>## The following object is masked from 'package:devtools':
+## 
+##     setup</code></pre>
+<pre><code>## Warning: package 'viridis' was built under R version 3.5.2</code></pre>
+<pre><code>## Loading required package: viridisLite</code></pre>
+<pre><code>## Warning: package 'ggforce' was built under R version 3.5.3</code></pre>
+<pre class="r"><code>source(paste0(projRoot, &quot;/R/functions_v1.1.R&quot;))  # Emily's functions
 
 # Local libraries ----
-library(kableExtra)  # for fancy tables
-library(skimr)  # for data descriptors (skim)
-# any extras?
+library(kableExtra)  # for fancy tables</code></pre>
+<pre><code>## Warning: package 'kableExtra' was built under R version 3.5.3</code></pre>
+<pre><code>## 
+## Attaching package: 'kableExtra'</code></pre>
+<pre><code>## The following object is masked from 'package:dplyr':
+## 
+##     group_rows</code></pre>
+<pre class="r"><code>library(skimr)  # for data descriptors (skim)</code></pre>
+<pre><code>## Warning: package 'skimr' was built under R version 3.5.3</code></pre>
+<pre><code>## 
+## Attaching package: 'skimr'</code></pre>
+<pre><code>## The following object is masked from 'package:kableExtra':
+## 
+##     kable</code></pre>
+<pre><code>## The following object is masked from 'package:stats':
+## 
+##     filter</code></pre>
+<pre class="r"><code># any extras?
 
 # Local functions ----</code></pre>
 <p>Session info (for reference)</p>
@@ -245,29 +345,26 @@ library(skimr)  # for data descriptors (skim)
 ## [16] rmarkdown_1.12    here_0.1         
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] httr_1.4.0        tidyr_0.8.3       pkgload_1.0.2    
-##  [4] R.utils_2.8.0     assertthat_0.2.1  highr_0.8        
-##  [7] cellranger_1.1.0  yaml_2.2.0        remotes_2.0.4    
-## [10] progress_1.2.0    sessioninfo_1.1.1 lattice_0.20-38  
-## [13] pillar_1.3.1      backports_1.1.4   glue_1.3.1       
-## [16] digest_0.6.18     polyclip_1.10-0   rvest_0.3.3      
-## [19] colorspace_1.4-1  Matrix_1.2-14     htmltools_0.3.6  
-## [22] R.oo_1.22.0       plyr_1.8.4        pkgconfig_2.0.2  
-## [25] purrr_0.3.2       scales_1.0.0      webshot_0.5.1    
-## [28] processx_3.3.0    tweenr_1.0.1      tibble_2.1.1     
-## [31] mgcv_1.8-24       farver_1.1.0      withr_2.1.2      
-## [34] lazyeval_0.2.2    cli_1.1.0         magrittr_1.5     
-## [37] crayon_1.3.4      readxl_1.3.1      memoise_1.1.0    
-## [40] evaluate_0.13     ps_1.3.0          R.methodsS3_1.7.1
-## [43] fs_1.2.7          nlme_3.1-137      MASS_7.3-50      
-## [46] xml2_1.2.0        pkgbuild_1.0.3    tools_3.5.1      
-## [49] prettyunits_1.0.2 hms_0.4.2         formatR_1.6      
-## [52] stringr_1.4.0     munsell_0.5.0     callr_3.2.0      
-## [55] compiler_3.5.1    rlang_0.3.4       grid_3.5.1       
-## [58] rstudioapi_0.10   labeling_0.3      gtable_0.3.0     
-## [61] reshape2_1.4.3    R6_2.4.0          knitr_1.22       
-## [64] rprojroot_1.3-2   desc_1.2.0        stringi_1.4.3    
-## [67] Rcpp_1.0.1        tidyselect_0.2.5  xfun_0.6</code></pre>
+##  [1] Rcpp_1.0.1        prettyunits_1.0.2 ps_1.3.0         
+##  [4] assertthat_0.2.1  rprojroot_1.3-2   digest_0.6.18    
+##  [7] R6_2.4.0          cellranger_1.1.0  plyr_1.8.4       
+## [10] backports_1.1.4   evaluate_0.13     httr_1.4.0       
+## [13] pillar_1.3.1      rlang_0.3.4       progress_1.2.0   
+## [16] lazyeval_0.2.2    readxl_1.3.1      rstudioapi_0.10  
+## [19] callr_3.2.0       desc_1.2.0        webshot_0.5.1    
+## [22] stringr_1.4.0     polyclip_1.10-0   munsell_0.5.0    
+## [25] compiler_3.5.1    xfun_0.6          pkgconfig_2.0.2  
+## [28] pkgbuild_1.0.3    htmltools_0.3.6   tidyselect_0.2.5 
+## [31] tibble_2.1.1      crayon_1.3.4      withr_2.1.2      
+## [34] MASS_7.3-50       grid_3.5.1        gtable_0.3.0     
+## [37] magrittr_1.5      formatR_1.6       scales_1.0.0     
+## [40] cli_1.1.0         stringi_1.4.3     farver_1.1.0     
+## [43] reshape2_1.4.3    fs_1.2.7          remotes_2.0.4    
+## [46] xml2_1.2.0        tools_3.5.1       glue_1.3.1       
+## [49] tweenr_1.0.1      purrr_0.3.2       hms_0.4.2        
+## [52] processx_3.3.0    pkgload_1.0.2     yaml_2.2.0       
+## [55] colorspace_1.4-1  sessioninfo_1.1.1 rvest_0.3.3      
+## [58] memoise_1.1.0     knitr_1.22</code></pre>
 </div>
 <div id="load-final-data" class="section level1">
 <h1><span class="header-section-number">2</span> Load final data</h1>
@@ -6956,7 +7053,7 @@ summary(lmTemp)</code></pre>
 ## F-statistic:  2207 on 2 and 58890 DF,  p-value: &lt; 2.2e-16</code></pre>
 <p>But I realise I I can’t use each point to model the overall trend - need to use mean or median powerW at each temperature.</p>
 <p>So here I’ve made a table with the temp, mean power for that temp, and median power for that temp which can be used to model the overall trend.</p>
-<pre class="r"><code>help &lt;- function(dt, temp, width) {
+<pre class="r"><code>createMeanMedianPower &lt;- function(dt, temp, width) {
     newDT &lt;- dt[temp - 0.5 * width &lt;= dt$meanTemp &amp; dt$meanTemp &lt; temp + 0.5 * 
         width]
     meanTempMeanPower &lt;- mean(newDT$powerW, na.rm = T)
@@ -6966,7 +7063,7 @@ summary(lmTemp)</code></pre>
 
 modelDT &lt;- rbindlist(lapply(seq(min(ejFilteredDT$meanTemp), max(ejFilteredDT$meanTemp), 
     1), function(l) {
-    return(help(ejFilteredDT, l, 1))
+    return(createMeanMedianPower(ejFilteredDT, l, 1))
 }))</code></pre>
 <p>Here I am making the linear model part for the mean.</p>
 <pre class="r"><code>polyTemp &lt;- poly(modelDT$temp, 2)
@@ -7014,46 +7111,46 @@ summary(lmMedianPowerW)</code></pre>
 ## Multiple R-squared:  0.7232, Adjusted R-squared:  0.7064 
 ## F-statistic: 43.11 on 2 and 33 DF,  p-value: 6.255e-10</code></pre>
 <p>Here I am making the fit of the models (both mean and median).</p>
-<pre class="r"><code>modelDT &lt;- cbind(modelDT, meanPowerFit = fitted(lmMeanPowerW), medianPowerFit = fitted(lmMedianPowerW))
+<pre class="r"><code>modelDT &lt;- cbind(modelDT, meanPowerWFit = fitted(lmMeanPowerW), medianPowerWFit = fitted(lmMedianPowerW))
 modelDT</code></pre>
-<pre><code>##     temp meanPowerW medianPowerW meanPowerFit medianPowerFit
-##  1:   -4  1425.9230   1429.13917    1173.4156      1010.4457
-##  2:   -3  1044.2993    974.26450    1095.7499       937.5231
-##  3:   -2   920.7150    697.08258    1022.1340       868.2816
-##  4:   -1   837.5371    605.23133     952.5679       802.7211
-##  5:    0   770.4796    579.02833     887.0516       740.8417
-##  6:    1   714.2605    530.97450     825.5852       682.6434
-##  7:    2   679.2211    497.79350     768.1686       628.1261
-##  8:    3   711.0973    529.73425     714.8018       577.2900
-##  9:    4   702.9884    511.33975     665.4849       530.1348
-## 10:    5   700.3121    527.27008     620.2178       486.6608
-## 11:    6   675.9416    520.29225     579.0005       446.8678
-## 12:    7   636.1374    489.09167     541.8330       410.7559
-## 13:    8   627.0058    498.12917     508.7154       378.3251
-## 14:    9   585.2988    475.53250     479.6475       349.5753
-## 15:   10   548.1570    430.06717     454.6296       324.5066
-## 16:   11   513.7694    404.82809     433.6614       303.1190
-## 17:   12   464.4672    354.33433     416.7431       285.4124
-## 18:   13   417.0457    311.37817     403.8746       271.3869
-## 19:   14   346.2159    255.43008     395.0559       261.0425
-## 20:   15   312.8952    227.23800     390.2870       254.3791
-## 21:   16   284.4805    199.71867     389.5680       251.3968
-## 22:   17   235.7314    154.50775     392.8988       252.0956
-## 23:   18   224.9729    129.20350     400.2794       256.4754
-## 24:   19   215.7502     91.52729     411.7099       264.5364
-## 25:   20   283.8491     97.34658     427.1902       276.2783
-## 26:   21   416.5980    274.09192     446.7203       291.7014
-## 27:   22   553.9254    393.10033     470.3002       310.8055
-## 28:   23   634.4990    506.65200     497.9300       333.5907
-## 29:   24   647.9627    520.74750     529.6096       360.0570
-## 30:   25   631.5846    427.38750     565.3390       390.2043
-## 31:   26   792.0128    486.03525     605.1182       424.0327
-## 32:   27   702.7686    435.43233     648.9473       461.5421
-## 33:   28   786.3970    460.37017     696.8262       502.7327
-## 34:   29   783.5110    448.58683     748.7549       547.6043
-## 35:   30   638.3953    461.02225     804.7335       596.1569
-## 36:   31   763.1065    783.73017     864.7619       648.3907
-##     temp meanPowerW medianPowerW meanPowerFit medianPowerFit</code></pre>
+<pre><code>##     temp meanPowerW medianPowerW meanPowerWFit medianPowerWFit
+##  1:   -4  1425.9230   1429.13917     1173.4156       1010.4457
+##  2:   -3  1044.2993    974.26450     1095.7499        937.5231
+##  3:   -2   920.7150    697.08258     1022.1340        868.2816
+##  4:   -1   837.5371    605.23133      952.5679        802.7211
+##  5:    0   770.4796    579.02833      887.0516        740.8417
+##  6:    1   714.2605    530.97450      825.5852        682.6434
+##  7:    2   679.2211    497.79350      768.1686        628.1261
+##  8:    3   711.0973    529.73425      714.8018        577.2900
+##  9:    4   702.9884    511.33975      665.4849        530.1348
+## 10:    5   700.3121    527.27008      620.2178        486.6608
+## 11:    6   675.9416    520.29225      579.0005        446.8678
+## 12:    7   636.1374    489.09167      541.8330        410.7559
+## 13:    8   627.0058    498.12917      508.7154        378.3251
+## 14:    9   585.2988    475.53250      479.6475        349.5753
+## 15:   10   548.1570    430.06717      454.6296        324.5066
+## 16:   11   513.7694    404.82809      433.6614        303.1190
+## 17:   12   464.4672    354.33433      416.7431        285.4124
+## 18:   13   417.0457    311.37817      403.8746        271.3869
+## 19:   14   346.2159    255.43008      395.0559        261.0425
+## 20:   15   312.8952    227.23800      390.2870        254.3791
+## 21:   16   284.4805    199.71867      389.5680        251.3968
+## 22:   17   235.7314    154.50775      392.8988        252.0956
+## 23:   18   224.9729    129.20350      400.2794        256.4754
+## 24:   19   215.7502     91.52729      411.7099        264.5364
+## 25:   20   283.8491     97.34658      427.1902        276.2783
+## 26:   21   416.5980    274.09192      446.7203        291.7014
+## 27:   22   553.9254    393.10033      470.3002        310.8055
+## 28:   23   634.4990    506.65200      497.9300        333.5907
+## 29:   24   647.9627    520.74750      529.6096        360.0570
+## 30:   25   631.5846    427.38750      565.3390        390.2043
+## 31:   26   792.0128    486.03525      605.1182        424.0327
+## 32:   27   702.7686    435.43233      648.9473        461.5421
+## 33:   28   786.3970    460.37017      696.8262        502.7327
+## 34:   29   783.5110    448.58683      748.7549        547.6043
+## 35:   30   638.3953    461.02225      804.7335        596.1569
+## 36:   31   763.1065    783.73017      864.7619        648.3907
+##     temp meanPowerW medianPowerW meanPowerWFit medianPowerWFit</code></pre>
 <p>tbc</p>
 <blockquote>
 <p>Needs to include the 0 values (see discussion above)?</p>
@@ -7067,7 +7164,7 @@ modelDT</code></pre>
 <pre class="r"><code>t &lt;- proc.time() - startTime
 
 elapsed &lt;- t[[3]]</code></pre>
-<p>Analysis completed in 185.28 seconds ( 3.09 minutes) using <a href="https://cran.r-project.org/package=knitr">knitr</a> in <a href="http://www.rstudio.com">RStudio</a> with R version 3.5.1 (2018-07-02) running on x86_64-w64-mingw32.</p>
+<p>Analysis completed in 197.89 seconds ( 3.3 minutes) using <a href="https://cran.r-project.org/package=knitr">knitr</a> in <a href="http://www.rstudio.com">RStudio</a> with R version 3.5.1 (2018-07-02) running on x86_64-w64-mingw32.</p>
 </div>
 <div id="r-packages-used" class="section level1">
 <h1><span class="header-section-number">7</span> R packages used</h1>

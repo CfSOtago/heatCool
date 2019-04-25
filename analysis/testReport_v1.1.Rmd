@@ -659,6 +659,7 @@ The increase in demand for power as the temperature rises is now clearer.
 > But this is fairly obvious since we are just looking at the households who responded to the temperature changes...
 
 # Modelling
+## Model for all houses in sample (disregardaring location)
 
 Here I am trying to attempt making a quadratic model using the _whole_ temperature range.
 ```{r ejFilteredModelPolyLMTotal}
@@ -667,7 +668,7 @@ lmTemp <- lm(ejFilteredDT$powerW~polyTemp) # quadratic - TOTAL DATA\
 summary(lmTemp)
 
 ```
-But I realise I I can't use each point to model the overall trend - need to use mean or median powerW at each temperature.
+But I realise I can't use each point to model the overall trend - need to use mean or median powerW at each temperature. EDIT: wait I think I can I just have to use geom_smooth() or something instead of points duh.
 
 So here I've made a table with the temp, mean power for that temp, and median power for that temp which can be used to model the overall trend.
 ``` {r modelDT}
@@ -701,12 +702,67 @@ Here I am making the linear model part for the median.
 ```
 
 Here I am making the fit of the models (both mean and median).
-``` {R fitted}
+``` {r fitted}
 modelDT <- cbind(modelDT, meanPowerWFit = fitted(lmMeanPowerW), medianPowerWFit = fitted(lmMedianPowerW))
 modelDT
 
 ```
-tbc
+
+So now applying the model to the plots in Figure \@ref(fig:tempDemandBoxEjFiltered).
+``` {r tempDemandBoxEjFilteredWithModel, fig.cap="Box plots of temperature vs demand by season and location with quadratic model"}
+ggplot2::ggplot(ejFilteredDT, mapping = aes(x = meanTemp, y = powerW/1000)) + 
+  geom_boxplot(aes(cut_width(meanTemp,
+                             width = 2, # change the width to get 'wider' bins
+                             boundary = 0)))  + 
+  facet_grid(. ~ location) +
+  labs(caption = combinedCaption,
+       x = "Mean temperature",
+       y = "Mean half-hourly kW") +
+  geom_smooth(modelDT, mapping = aes(temp, meanPowerWFit/1000),colour = 'red') + # mean fit
+  geom_smooth(modelDT, mapping = aes(temp, medianPowerWFit/1000),colour = 'blue') # median fit
+  
+```
+
+## Modelling power vs temperature with consideration of location
+
+This method does not involve taking the mean or median of the power for each binned temperature and just takes into account all points
+``` {r locationtest}
+ggplot2::ggplot(ejFilteredDT, mapping = aes(x = meanTemp, y = powerW/1000)) + 
+  geom_boxplot(aes(cut_width(meanTemp,
+                             width = 2, # change the width to get 'wider' bins
+                             boundary = 0)))  + 
+  geom_smooth(method = "lm", formula = y~poly(x,2), se = F) +
+  facet_grid(. ~ location) +
+  labs(caption = combinedCaption,
+       x = "Mean temperature",
+       y = "Mean half-hourly kW")
+
+```
+
+## Modelling power vs temperature but for only a certain range
+
+So we only want to model for U curve-y bit. 
+```{r ejFilteredDTRangePlotFit}
+# only want rows where temp is between 18 +- 10
+temp = 18
+ejFilteredDTRange <- ejFilteredDT[temp - 10 <= meanTemp & meanTemp < temp + 10,]
+
+ggplot2::ggplot(ejFilteredDTRange, mapping = aes(x = meanTemp, y = powerW/1000)) + 
+  geom_boxplot(aes(cut_width(meanTemp,
+                             width = 2, # change the width to get 'wider' bins
+                             boundary = 0)))  + 
+  geom_smooth(method = "lm", formula = y~poly(x,2), se = F) +
+  facet_grid(. ~ location) +
+  labs(caption = combinedCaption,
+       x = "Mean temperature",
+       y = "Mean half-hourly kW")
+
+```
+
+``` {r summaryejFilteredDTRangeLM}
+summary(lm((ejFilteredDTRange$powerW)/1000~poly(ejFilteredDTRange$meanTemp, 2)))
+```
+
 
 > Needs to include the 0 values (see discussion above)?
 
