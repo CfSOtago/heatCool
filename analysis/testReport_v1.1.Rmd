@@ -755,9 +755,10 @@ ggplot2::ggplot(ejFilteredDTRange, mapping = aes(x = meanTemp, y = powerW/1000))
   facet_grid(. ~ location) +
   labs(caption = combinedCaption,
        x = "Mean temperature",
-       y = "Mean half-hourly kW")
+       y = "Mean half-hourly kW") 
 
 ```
+Test
 
 ``` {r summaryejFilteredDTRangeLM}
 summary(lm((ejFilteredDTRange$powerW)/1000~poly(ejFilteredDTRange$meanTemp, 2)))
