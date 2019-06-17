@@ -681,29 +681,29 @@ createMeanMedianPower <- function(dt, temp, width){
              "medianPowerW" = meanTempMedianPower))
 }
 
-modelDT <- rbindlist(lapply(seq(min(ejFilteredDT$meanTemp), max(ejFilteredDT$meanTemp), 1), function(l){
+modelDT0 <- rbindlist(lapply(seq(min(ejFilteredDT$meanTemp), max(ejFilteredDT$meanTemp), 1), function(l){
       return(createMeanMedianPower(ejFilteredDT, l, 1))
     }))
 ```
 
 Here I am making the linear model part for the mean.
 ``` {r linearModelMean}
-  polyTemp <- poly(modelDT$temp, 2)
-  lmMeanPowerW <- lm(modelDT$meanPowerW~polyTemp)
+  polyTemp <- poly(modelDT0$temp, 2)
+  lmMeanPowerW <- lm(modelDT0$meanPowerW~polyTemp)
   summary(lmMeanPowerW)
 
 ```
 
 Here I am making the linear model part for the median.
 ``` {r linearModelMedian}
-  lmMedianPowerW <- lm(modelDT$medianPowerW~polyTemp)
+  lmMedianPowerW <- lm(modelDT0$medianPowerW~polyTemp)
   summary(lmMedianPowerW)
 
 ```
 
 Here I am making the fit of the models (both mean and median).
 ``` {r fitted}
-modelDT <- cbind(modelDT, meanPowerWFit = fitted(lmMeanPowerW), medianPowerWFit = fitted(lmMedianPowerW))
+modelDT <- cbind(modelDT0, meanPowerWFit = fitted(lmMeanPowerW), medianPowerWFit = fitted(lmMedianPowerW))
 modelDT
 
 ```
@@ -720,6 +720,7 @@ ggplot2::ggplot(ejFilteredDT, mapping = aes(x = meanTemp, y = powerW/1000)) +
        y = "Mean half-hourly kW") +
   geom_smooth(modelDT, mapping = aes(temp, meanPowerWFit/1000),colour = 'red') + # mean fit
   geom_smooth(modelDT, mapping = aes(temp, medianPowerWFit/1000),colour = 'blue') # median fit
+
   
 ```
 
@@ -743,6 +744,7 @@ ggplot2::ggplot(ejFilteredDT, mapping = aes(x = meanTemp, y = powerW/1000)) +
 
 So we only want to model for U curve-y bit. 
 ```{r ejFilteredDTRangePlotFit}
+
 # only want rows where temp is between 18 +- 10
 temp = 18
 ejFilteredDTRange <- ejFilteredDT[temp - 10 <= meanTemp & meanTemp < temp + 10,]
@@ -755,15 +757,25 @@ ggplot2::ggplot(ejFilteredDTRange, mapping = aes(x = meanTemp, y = powerW/1000))
   facet_grid(. ~ location) +
   labs(caption = combinedCaption,
        x = "Mean temperature",
-       y = "Mean half-hourly kW") 
-
+       y = "Mean half-hourly kW")
 ```
-Test
+# Summary of Fits
 
+This gives the fit for all the houses. 
 ``` {r summaryejFilteredDTRangeLM}
 summary(lm((ejFilteredDTRange$powerW)/1000~poly(ejFilteredDTRange$meanTemp, 2)))
 ```
 
+Fits by location
+```{r summaryejFilteredDTRangeLM15876}
+summary(lm(ejFilteredDTRange[location == 15876,]$powerW/1000~poly(ejFilteredDTRange[location == 15876,]$meanTemp, 2)))
+```
+```{r summaryejFilteredDTRangeLM23872}
+summary(lm(ejFilteredDTRange[location == 23872,]$powerW/1000~poly(ejFilteredDTRange[location == 23872,]$meanTemp, 2)))
+```
+So for some reason, the fits are not lining up with the data. I am just going to leave it for now because I can't figure out why it is doing this. I think/hope this is why the R-squared values are very poor as well.
+
+Say that the model fits - now what?
 
 > Needs to include the 0 values (see discussion above)?
 
