@@ -46,7 +46,7 @@ projRoot <- here::here()
 
 # Emily's libraries and functions
 source(paste0(projRoot, "/R/libraries.R")) # Emily's recommended libraries
-source(paste0(projRoot, "/R/functions.R")) # Emily's functions
+source(paste0(projRoot, "/R/functions_v1.1.R")) # Emily's functions
 
 # Local libraries ----
 library(kableExtra) # for fancy tables
@@ -659,8 +659,164 @@ The increase in demand for power as the temperature rises is now clearer.
 > But this is fairly obvious since we are just looking at the households who responded to the temperature changes...
 
 # Modelling
+## Model for all houses in sample (disregardaring location)
 
-tbc
+Here I am trying to attempt making a quadratic model using the _whole_ temperature range.
+```{r ejFilteredModelPolyLMTotal}
+polyTemp <- poly(ejFilteredDT$meanTemp, 2)
+lmTemp <- lm(ejFilteredDT$powerW~polyTemp) # quadratic - TOTAL DATA\
+summary(lmTemp)
+
+```
+But I realise I can't use each point to model the overall trend - need to use mean or median powerW at each temperature. EDIT: wait I think I can I just have to use geom_smooth() or something instead of points duh.
+
+So here I've made a table with the temp, mean power for that temp, and median power for that temp which can be used to model the overall trend.
+``` {r modelDT}
+createMeanMedianPower <- function(dt, temp, width){
+  newDT <- dt[temp - 0.5*width <= dt$meanTemp & dt$meanTemp < temp + 0.5*width]
+  meanTempMeanPower <- mean(newDT$powerW, na.rm = T)
+  meanTempMedianPower <- median(newDT$powerW, na.rm = T)
+  return(data.table("meanTemp" = temp,
+             "meanPowerW" = meanTempMeanPower,
+             "medianPowerW" = meanTempMedianPower))
+}
+
+modelDT0 <- rbindlist(lapply(seq(min(ejFilteredDT$meanTemp), max(ejFilteredDT$meanTemp), 1), function(l){
+      return(createMeanMedianPower(ejFilteredDT, l, 1))
+    }))
+```
+
+Here I am making the linear model part for the mean.
+``` {r linearModelMean}
+  polyTemp <- poly(modelDT0$meanTemp, 2)
+  lmMeanPowerW <- lm(modelDT0$meanPowerW~polyTemp)
+  summary(lmMeanPowerW)
+
+```
+
+Here I am making the linear model part for the median.
+``` {r linearModelMedian}
+  lmMedianPowerW <- lm(modelDT0$medianPowerW~polyTemp)
+  summary(lmMedianPowerW)
+
+```
+
+Here I am making the fit of the models (both mean and median).
+``` {r fitted}
+modelDT <- cbind(modelDT0, meanPowerWFit = fitted(lmMeanPowerW), medianPowerWFit = fitted(lmMedianPowerW))
+modelDT
+
+```
+This is for the total data set. I still don't know how ggplot works and why the fits don't match the boxplot
+``` {r modelDTmodel}
+ggplot2::ggplot(data = ejFilteredDT, aes(x = meanTemp, y = powerW)) +
+  geom_boxplot(mapping = aes(cut_width(meanTemp, width = 0.5, boundary = 0))) +
+  geom_line(data = modelDT, mapping = aes(x = meanTemp, y = meanPowerWFit), colour = 'red') +
+  geom_line(data = modelDT, mapping = aes(x = meanTemp, y = medianPowerWFit), colour = 'blue')
+  
+```
+
+
+So now applying the model to the plots in Figure \@ref(fig:tempDemandBoxEjFiltered).
+``` {r tempDemandBoxEjFilteredWithModel, fig.cap="Box plots of temperature vs demand by season and location with quadratic model"}
+ggplot2::ggplot(ejFilteredDT, mapping = aes(x = meanTemp, y = powerW/1000)) + 
+  geom_boxplot(aes(cut_width(meanTemp,
+                             width = 2, # change the width to get 'wider' bins
+                             boundary = 0)))  + 
+  facet_grid(. ~ location) +
+  labs(caption = combinedCaption,
+       x = "Mean temperature",
+       y = "Mean half-hourly kW") +
+  geom_line(modelDT, mapping = aes(meanTemp, meanPowerWFit/1000),colour = 'red') + # mean fit
+  geom_smooth(modelDT, mapping = aes(meanTemp, medianPowerWFit/1000),colour = 'blue') # median fit
+
+```
+NB: The models are only for the total data set - not split up by location.
+
+For some reason, the geom_smooth layer doesn't match the x axis labelling as the boxplot layer:
+``` {r smooth_vs_boxplot}
+ggplot2::ggplot(ejFilteredDT, mapping = aes(x = meanTemp, y = powerW/1000)) + 
+  geom_boxplot(aes(cut_width(meanTemp,
+                             width = 1, # change the width to get 'wider' bins
+                             boundary = 0)))  + 
+  facet_grid(. ~ location) +
+  labs(caption = combinedCaption,
+       x = "Mean temperature",
+       y = "Mean half-hourly kW") +
+  geom_smooth(modelDT, mapping = aes(meanTemp, meanPowerWFit/1000),colour = 'red') + # mean fit
+  geom_smooth(modelDT, mapping = aes(meanTemp, medianPowerWFit/1000),colour = 'blue') # median fit
+```
+You can see that the 'fit' doesn't change with the boxplot. So the fit must be based off the inherit value of the x axis, rather than what the shown values are. modelDT0$temp ranges from -4 - 31. Where the vertical lines start I am guessing is the inherit '0', despite the labelling saying otherwise.
+
+
+## Modelling power vs temperature with consideration of location
+
+This method does not involve taking the mean or median of the power for each binned temperature and just takes into account all points
+``` {r locationtest}
+ggplot2::ggplot(ejFilteredDT, mapping = aes(x = meanTemp, y = powerW/1000)) + 
+  geom_boxplot(aes(cut_width(meanTemp,
+                             width = 2, # change the width to get 'wider' bins
+                             boundary = 0)))  + 
+  geom_smooth(method = "lm", formula = y~poly(x,2), se = F) +
+  facet_grid(. ~ location) +
+  labs(caption = combinedCaption,
+       x = "Mean temperature",
+       y = "Mean half-hourly kW")
+
+```
+
+## Modelling power vs temperature but for only a certain range
+
+So we only want to model for U curve-y bit. 
+```{r ejFilteredDTRangePlotFit}
+
+# only want rows where temp is between 18 +- 10
+temp = 18
+ejFilteredDTRange <- ejFilteredDT[temp - 10 <= meanTemp & meanTemp < temp + 10,]
+
+ggplot2::ggplot(ejFilteredDTRange, mapping = aes(x = meanTemp, y = powerW/1000)) + 
+  geom_boxplot(aes(cut_width(meanTemp,
+                             width = 2, # change the width to get 'wider' bins
+                             boundary = 0)))  + 
+  geom_smooth(method = "lm", formula = y~poly(x,2), se = F) +
+  facet_grid(. ~ location) +
+  labs(caption = combinedCaption,
+       x = "Mean temperature",
+       y = "Mean half-hourly kW")
+```
+# Summary of Fits
+Because when actually plotting doeesn't save the values of the plot, need to separately make the numbers appear.
+
+This gives the fit for all the houses in kWh???? or Wh????
+``` {r summaryejFilteredDTRangeLM}
+totalFit <- summary(lm((ejFilteredDTRange$powerW)/1000~poly(ejFilteredDTRange$meanTemp, 2)))
+
+getCoefficients <- function(summaryDT){
+#assuming that the fit is of degree 3 i.e. quadratic
+c = summaryDT$coefficients[1] 
+b = summaryDT$coefficients[2] 
+a = summaryDT$coefficients[3] 
+return(c(a,b,c))
+}
+
+#recreating the model
+  x = seq(-20,28,1) #'temperature' values
+  coeff = getCoefficients(totalFit)
+  yFit = coeff[1]*x^2 + coeff[2]*x + coeff[3] #fitted power values in Wh?
+  plot(x,yFit)
+```
+Turns out that between 8 < x < 28, it is not where the minima is. This is not what I was expecting so how I've made the quadratic is obviously wrong.
+
+
+Fits by location
+```{r summaryejFilteredDTRangeLM15876}
+summary(lm(ejFilteredDTRange[location == 15876,]$powerW/1000~poly(ejFilteredDTRange[location == 15876,]$meanTemp, 2)))
+```
+```{r summaryejFilteredDTRangeLM23872}
+summary(lm(ejFilteredDTRange[location == 23872,]$powerW/1000~poly(ejFilteredDTRange[location == 23872,]$meanTemp, 2)))
+```
+So for some reason, the fits are not lining up with the data. I am just going to leave it for now because I can't figure out why it is doing this. I think/hope this is why the R-squared values are very poor as well.
+
 
 > Needs to include the 0 values (see discussion above)?
 
